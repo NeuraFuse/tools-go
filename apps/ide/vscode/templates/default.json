@@ -1,0 +1,36 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Accelerator | Develop | NeuraFuse",
+            "type": "python",
+            "request": "attach",
+            "port": 2000,
+            "host": "localhost",
+            "pathMappings": [
+                {
+                  "localRoot": "${workspaceFolder}/lightning/tf",
+                  "remoteRoot": "/app/lightning/tf"
+                }
+            ]
+        },
+        {
+            "name": "NeuraCLI | NeuraFuse",
+            "type": "go",
+            "request": "launch",
+            "mode": "debug",
+            "program": "${workspaceFolder}/neuracli/neuracli.go",
+            "args": ["api", "inspect"],
+            "console": "integratedTerminal"
+        },
+        {
+            "name": "neurakube | NeuraFuse",
+            "type": "go",
+            "request": "launch",
+            "mode": "debug",
+            "program": "${workspaceFolder}/neurakube/neurakube.go",
+            "args": [],
+            "console": "integratedTerminal"
+        }
+    ]
+}
