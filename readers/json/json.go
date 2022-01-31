@@ -4,10 +4,10 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"../../errors"
-	"../../filesystem"
-	"../../runtime"
-	"../../timing"
+	"github.com/neurafuse/tools-go/errors"
+	"github.com/neurafuse/tools-go/filesystem"
+	"github.com/neurafuse/tools-go/runtime"
+	"github.com/neurafuse/tools-go/timing"
 )
 
 var myClient = &http.Client{Timeout: timing.GetTimeDuration(5, "s")}

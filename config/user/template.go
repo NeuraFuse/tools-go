@@ -6,6 +6,11 @@ type Default struct {
 	Metadata   struct {
 	} `json:"metadata"`
 	Spec       struct {
+		Defaults   struct {
+			Infrastructure struct {
+				ID string `json:"id"`
+			} `json:"infrastructure"`
+		} `json:"defaults"`
 		Auth       struct {
 			JWT    struct {
 				SigningKey string `json:"signingKey"`

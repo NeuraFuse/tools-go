@@ -13,12 +13,12 @@ import (
 	"math/big"
 	"os"
 
-	"../../errors"
-	"../../filesystem"
-	"../../logging"
-	"../../runtime"
-	"../../timing"
-	"../../vars"
+	"github.com/neurafuse/tools-go/errors"
+	"github.com/neurafuse/tools-go/filesystem"
+	"github.com/neurafuse/tools-go/logging"
+	"github.com/neurafuse/tools-go/runtime"
+	"github.com/neurafuse/tools-go/timing"
+	"github.com/neurafuse/tools-go/vars"
 )
 
 func GenerateKeys(module, certPath string, printKeys bool) (string, string) {

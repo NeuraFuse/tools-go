@@ -1,17 +1,17 @@
 package updater
 
 import (
-	"../config"
-	"../env"
-	"../errors"
-	"../filesystem"
-	"../io"
-	"../logging"
-	"../logging/emoji"
-	"../readers/json"
-	"../runtime"
-	"../terminal"
-	"../vars"
+	"github.com/neurafuse/tools-go/config"
+	"github.com/neurafuse/tools-go/env"
+	"github.com/neurafuse/tools-go/errors"
+	"github.com/neurafuse/tools-go/filesystem"
+	"github.com/neurafuse/tools-go/io"
+	"github.com/neurafuse/tools-go/logging"
+	"github.com/neurafuse/tools-go/logging/emoji"
+	"github.com/neurafuse/tools-go/readers/json"
+	"github.com/neurafuse/tools-go/runtime"
+	"github.com/neurafuse/tools-go/terminal"
+	"github.com/neurafuse/tools-go/vars"
 )
 
 type F struct{}
@@ -23,17 +23,20 @@ type Info struct {
 }
 
 var context string = env.F.GetContext(env.F{}, runtime.F.GetCallerInfo(runtime.F{}, true), false)
-var envActive string = env.F.GetActive(env.F{}, false)
 
 func (f F) Check() {
 	update, versionInstalled, versionRecent, err := f.checkVersion()
 	if !errors.Check(err, runtime.F.GetCallerInfo(runtime.F{}, false), "Version check failed!", false, false, true) {
 		if update {
-			if config.Setting("get", "cli", "Spec.Updates.Auto.Status", "") != "disabled" {
-				f.update(versionRecent)
+			if !config.DevConfigActive() {
+				if config.Setting("get", "cli", "Spec.Updates.Auto.Status", "") != "disabled" {
+					f.update(versionRecent)
+				} else {
+					emoji.Println("", vars.EmojiGlobe, vars.EmojiWarning, "There is an update available but you have turned off auto. updates.")
+					emoji.Println("", vars.EmojiWarning, vars.EmojiInfo, "You can enable auto updates via the CLI Settings.\n")
+				}
 			} else {
-				emoji.Println("", vars.EmojiGlobe, vars.EmojiWarning, "There is an update available but you have turned off auto. updates.")
-				emoji.Println("", vars.EmojiWarning, vars.EmojiInfo, "You can enable auto updates via the CLI Settings.\n")
+				emoji.Println("", vars.EmojiDev, vars.EmojiGlobe, "Skipped available update due to developer mode.")
 			}
 		} else {
 			emoji.Println("", vars.EmojiGlobe, vars.EmojiSuccess, "Version ("+versionInstalled+") is up to date.\n")
@@ -47,6 +50,8 @@ func (f F) checkVersion() (bool, string, string, error) {
 	versionRecent, err := f.getVersionRecent()
 	if versionInstalled != versionRecent {
 		update = true
+		emoji.Println("", vars.EmojiAssistant, vars.EmojiGlobe, "There is an update available for "+env.F.GetActive(env.F{}, true)+".")
+		emoji.Println("", vars.EmojiAssistant, vars.EmojiGlobe, "Version "+versionInstalled+" --> "+versionRecent+"\n")
 	}
 	return update, versionInstalled, versionRecent, err
 }
@@ -55,16 +60,11 @@ func (f F) getVersionRecent() (string, error) {
 	var versionRecent string
 	var err error
 	var info *Info = new(Info)
-	if config.Setting("get", "dev", "Spec.Status", "") != "active" {
-		var url string = f.getUpdateInfoURL()
-		if io.F.Reachable(io.F{}, url) {
-			json.URLToInterface(url, info)
-		} else {
-			err = errors.New("Unable to get recent " + env.F.GetActive(env.F{}, true) + " version (" + url + " not reachable)!")
-		}
+	var url string = f.getUpdateInfoURL()
+	if io.F.Reachable(io.F{}, url) {
+		json.URLToInterface(url, info)
 	} else {
-		var filePath string = f.GetRepoUpdateDir() + f.getUpdateInfoFile()
-		json.FileToStruct(filePath, info)
+		err = errors.New("Unable to get recent " + env.F.GetActive(env.F{}, true) + " version (" + url + " not reachable)!")
 	}
 	if err == nil {
 		versionRecent = info.Version.Recent
@@ -101,15 +101,20 @@ func (f F) getReleaseDownloadURL(version string) string {
 	switch f.getProvider() {
 	case "github":
 		url = url + vars.OrganizationNameRepo + "/" + env.F.GetActive(env.F{}, false) + "/releases/download/" + version + "/"
+		url = url + f.getReleaseDownloadFile()
 	case "neurafuse":
 		//url = url + env.F.GetActive(env.F{}, false) + "/" TODO:
 	}
 	return url
 }
 
+func (f F) getReleaseDownloadFile() string {
+	return env.F.GetActive(env.F{}, false) + "-" + runtime.F.GetOS(runtime.F{}) + "-" + runtime.F.GetOSArchitecture(runtime.F{})
+}
+
 func (f F) CreateRepoInfoFile() {
 	logging.Log([]string{"", vars.EmojiDev, vars.EmojiSettings}, "Creating repo "+context+" info file..", 0)
-	var filePath string = f.GetRepoUpdateDir()+f.getUpdateInfoFile()
+	var filePath string = f.GetRepoUpdateDir() + f.getUpdateInfoFile()
 	if filesystem.Exists(filePath) {
 		filesystem.Delete(filePath, false)
 	}
@@ -129,7 +134,7 @@ func (f F) GetRepoUpdateDir() string {
 
 func (f F) GetRepoUpdateBuildsDir() string {
 	var repoUpdateBuildsDir string = "builds/"
-	return f.GetRepoUpdateDir()+repoUpdateBuildsDir
+	return f.GetRepoUpdateDir() + repoUpdateBuildsDir
 }
 
 func (f F) getUpdateInfoFile() string {
@@ -141,15 +146,14 @@ func (f F) getTmpDir() string {
 }
 
 func (f F) update(versionRecent string) {
-	//logging.Log([]string{"", vars.EmojiProcess, ""}, "Starting update..", 0)
-	emoji.Println("", vars.EmojiProcess, "", "Updating "+envActive+"..")
-	url := f.getReleaseDownloadURL(versionRecent) + envActive + "-" + runtime.F.GetOS(runtime.F{}) + "-" + runtime.F.GetOSArchitecture(runtime.F{})
-	tmpPath := f.getTmpDir() + context + "/" + envActive
+	emoji.Println("", vars.EmojiProcess, vars.EmojiInfo, "Starting update..")
+	url := f.getReleaseDownloadURL(versionRecent)
+	tmpPath := f.getTmpDir() + "update/" + f.getReleaseDownloadFile()
 	err := io.F.DownloadFile(io.F{}, tmpPath, url)
 	if !errors.Check(err, runtime.F.GetCallerInfo(runtime.F{}, false), "Unable to download recent "+env.F.GetActive(env.F{}, true)+" version!", false, false, true) {
-		filesystem.Delete(envActive, true)
-		filesystem.Move(tmpPath, envActive, true)
-		emoji.Println("", vars.EmojiProcess, vars.EmojiSuccess, "Updated "+envActive+".")
+		filesystem.Delete(f.getReleaseDownloadFile(), false)
+		filesystem.Move(tmpPath, f.getReleaseDownloadFile(), false)
+		emoji.Println("", vars.EmojiProcess, vars.EmojiSuccess, "Updated "+env.F.GetActive(env.F{}, false)+".")
 		emoji.Println("", vars.EmojiProcess, vars.EmojiInfo, "Please restart to apply the updates.")
 		terminal.Exit(0, "")
 	}

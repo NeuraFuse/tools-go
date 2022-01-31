@@ -3,32 +3,33 @@ package kubernetes
 import (
 	"strings"
 
-	"../errors"
-	"../logging"
-	"../nlp"
-	"../objects"
-	"../runtime"
-	"../terminal"
-	"../vars"
-	"./deployments"
-	"./namespaces"
+	"github.com/neurafuse/tools-go/errors"
+	"github.com/neurafuse/tools-go/kubernetes/deployments"
+	"github.com/neurafuse/tools-go/kubernetes/namespaces"
+	"github.com/neurafuse/tools-go/logging"
+	"github.com/neurafuse/tools-go/nlp"
+	"github.com/neurafuse/tools-go/objects"
+	"github.com/neurafuse/tools-go/runtime"
+	"github.com/neurafuse/tools-go/terminal"
+	"github.com/neurafuse/tools-go/vars"
 )
 
 type F struct{}
 
 var actionTypes []string = []string{"get", "logs", "inspect", "create", "delete"}
+var cliOpts []string = []string{"logs", "inspect"}
 var resourceTypes []string = []string{"pod", "deployment", "service", "volume", "namespace", "node", "daemonset"}
 
 func (f F) Router(cliArgs []string, routeAssistant bool) { // TODO: Bugfix logs [namespace] ..
-	var action string = ""
-	var namespace string = ""
+	var action string
+	var namespace string
 	if routeAssistant || len(cliArgs) < 2 {
-		action = terminal.GetUserSelection("Which "+runtime.F.GetCallerInfo(runtime.F{}, true)+" action do you want to start?", actionTypes, false, false)
+		action = terminal.GetUserSelection("Which cluster action do you intend to start?", cliOpts, false, false) // TODO: Full CLI coverage of all resource types with variable actionTypes as options
 	} else {
 		action = cliArgs[1]
 	}
 	lenCliArgs := len(cliArgs)
-	namespaceMissing := false
+	var namespaceMissing bool
 	if len(cliArgs) <= 2 || len(cliArgs) < 4 {
 		if action != "inspect" && action != "logs" && action != "get" {
 			namespace = terminal.GetUserInput("Which namespace do you want to select for the action " + action + "?")
@@ -45,8 +46,8 @@ func (f F) Router(cliArgs []string, routeAssistant bool) { // TODO: Bugfix logs 
 	if action == "inspect" {
 		f.inspect(namespace)
 	}
-	var resourceType string = ""
-	var actionTypeMultiple bool = false
+	var resourceType string
+	var actionTypeMultiple bool
 	if routeAssistant || lenCliArgs < 4 {
 		if action == "create" || action == "delete" {
 			resourceType = terminal.GetUserSelection("On which resource type do you want to call the action "+action+"?", resourceTypes, false, false)
@@ -71,14 +72,14 @@ func (f F) Router(cliArgs []string, routeAssistant bool) { // TODO: Bugfix logs 
 	}
 	logging.Log([]string{"", vars.EmojiKubernetes, vars.EmojiInspect}, nlp.VerbToAction(strings.Title(action))+"ing "+resourceType+"..", 0)
 	logging.Log([]string{"", vars.EmojiInspect, vars.EmojiInfo}, "Namespace: "+namespace, 0)
-	var resourceID string = ""
+	var resourceID string
 	if !actionTypeMultiple {
 		index := 5
 		if action == "logs" {
 			index = 4
 		}
 		if routeAssistant || len(cliArgs) < index {
-			deployments := deployments.F.GetList(deployments.F{}, namespace, false)
+			deployments := deployments.F.Get(deployments.F{}, namespace, false)
 			if len(deployments) != 0 {
 				resourceID = terminal.GetUserSelection("On which specific "+resourceType+" do you want to call the action "+action+"?", deployments, false, false)
 			} else {
@@ -89,7 +90,7 @@ func (f F) Router(cliArgs []string, routeAssistant bool) { // TODO: Bugfix logs 
 			resourceID = cliArgs[index-1]
 		}
 	}
-	success := false
+	var success bool
 	if actionTypeMultiple {
 		if resourceType == "volumes" {
 			success, _ = objects.CallStructInterfaceFuncByName(ResourceTypes{}, strings.Title(resourceType), strings.Title(action), namespace, "pvc", true)

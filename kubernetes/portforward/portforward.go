@@ -203,8 +203,7 @@ func (pf *PortForwarder) ForwardPorts() error {
 // to the remote host via streams.
 func (pf *PortForwarder) forward() error {
 	var err error
-
-	listenSuccess := false
+	var listenSuccess bool
 	for i := range pf.ports {
 		port := &pf.ports[i]
 		err = pf.listenOnPort(port)

@@ -6,12 +6,12 @@ import (
 	"io"
 	"os"
 
-	"../../errors"
-	"../../filesystem"
-	"../../logging"
-	"../../objects/strings"
-	"../../runtime"
-	"../../vars"
+	"github.com/neurafuse/tools-go/errors"
+	"github.com/neurafuse/tools-go/filesystem"
+	"github.com/neurafuse/tools-go/logging"
+	"github.com/neurafuse/tools-go/objects/strings"
+	"github.com/neurafuse/tools-go/runtime"
+	"github.com/neurafuse/tools-go/vars"
 )
 
 func ExtractTarGz(filePath string) {

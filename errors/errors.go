@@ -2,15 +2,16 @@ package errors
 
 import (
 	"errors"
-	"os"
 	"fmt"
-	"../logging/emoji"
-	"../vars"
-	"../logging/color"
+	"os"
+
+	"github.com/neurafuse/tools-go/logging/color"
+	"github.com/neurafuse/tools-go/logging/emoji"
+	"github.com/neurafuse/tools-go/vars"
 )
 
 func Check(err error, callerInfo, msg string, hasFailed, exit, log bool) bool {
-	var error bool = false
+	var error bool
 	if err != nil || hasFailed {
 		error = true
 		if log {

@@ -1,16 +1,16 @@
 package releases
 
 import (
-	"../build"
-	"../container"
-	"../env"
-	"../logging"
-	"../runtime"
-	"../terminal"
-	"../updater"
-	"../vars"
-	"../git"
-	//"./license"
+	"github.com/neurafuse/tools-go/build"
+	"github.com/neurafuse/tools-go/container"
+	"github.com/neurafuse/tools-go/env"
+	"github.com/neurafuse/tools-go/git"
+	"github.com/neurafuse/tools-go/logging"
+	"github.com/neurafuse/tools-go/runtime"
+	"github.com/neurafuse/tools-go/terminal"
+	"github.com/neurafuse/tools-go/updater"
+	"github.com/neurafuse/tools-go/vars"
+	//"github.com/neurafuse/tools-go/releases/license"
 )
 
 type F struct{}
@@ -32,16 +32,16 @@ func (f F) processBuild(context, mode string, modes []string) {
 	git.F.CreateIgnoreFile(git.F{})
 	updater.F.CreateRepoInfoFile(updater.F{})
 	switch mode {
-		case modes[0]:
-			f.localBuild(context)
-		case modes[1]:
-			f.remoteBuild(context)
-			f.publishBuild(context)
+	case modes[0]:
+		f.localBuild(context)
+	case modes[1]:
+		f.remoteBuild(context)
+		f.publishBuild(context)
 	}
 }
 
 func (f F) publishBuild(context string) {
-	publish := terminal.GetUserSelection("Do you want to publish this remote build?", []string{}, false, true)
+	var publish string = terminal.GetUserSelection("Do you want to publish this remote build?", []string{}, false, true)
 	if publish == "Yes" {
 		f.remotePublish(context)
 	}

@@ -30,7 +30,7 @@ func TimeDurationPassed(start, end time.Time, limit int, format string) bool {
 	}
 }
 
-func TimeOut(units int, format string) {
+func Sleep(units int, format string) {
 	time.Sleep(GetTimeDuration(units, format))
 }
 

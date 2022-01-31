@@ -2,14 +2,17 @@ package jwt
 
 import (
 	"fmt"
-	"time"
-
-	crypto ".."
 	jwtgo "github.com/dgrijalva/jwt-go"
+	"github.com/neurafuse/tools-go/random"
+	"time"
 )
 
-var SigningKeyDefault = []byte("FAFWhdfli3209834z5hnAEFhklusefgli218AFESGliw3q9q3")
-var SigningKeyActive = SigningKeyDefault
+var signingKeyDefault = []byte("FAFWhdfli3209834z5hnAEFhklusefgli218AFESGliw3q9q3")
+var SigningKeyActive = signingKeyDefault
+
+func ResetSigningKey() {
+	SigningKeyActive = signingKeyDefault
+}
 
 func GenerateToken(signingKey []byte) (string, error) {
 	token := jwtgo.New(jwtgo.SigningMethodHS256)
@@ -31,5 +34,5 @@ func GenerateToken(signingKey []byte) (string, error) {
 }
 
 func GenerateSigningKey() string {
-	return crypto.RandomString(64)
+	return random.GetString(64)
 }

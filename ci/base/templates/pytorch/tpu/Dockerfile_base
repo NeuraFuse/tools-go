@@ -1,0 +1,10 @@
+FROM gcr.io/tpu-pytorch/xla:r1.7
+
+RUN pip install future
+RUN pip install debugpy
+RUN pip install tensorflow-io
+RUN pip install tensorboard
+RUN pip install flask
+
+RUN pip install torch_optimizer
+RUN pip install psutil

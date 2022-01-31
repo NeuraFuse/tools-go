@@ -1,25 +1,24 @@
 package installer
 
 import (
-	"../config"
-	"../env"
-	"../filesystem"
-	"../logging"
-	"../runtime"
-	"../terminal"
-	"../vars"
+	"github.com/neurafuse/tools-go/config"
+	"github.com/neurafuse/tools-go/env"
+	"github.com/neurafuse/tools-go/filesystem"
+	"github.com/neurafuse/tools-go/logging"
+	"github.com/neurafuse/tools-go/runtime"
+	"github.com/neurafuse/tools-go/terminal"
+	"github.com/neurafuse/tools-go/vars"
 )
 
 type F struct{}
 
 func (f F) CheckLocalSetup() {
-	devConfigStatus := config.Setting("get", "dev", "Spec.Status", "")
-	if devConfigStatus != "active" {
-		envActive := env.F.GetActive(env.F{}, false)
-		envActiveTitle := env.F.GetActive(env.F{}, true)
-		workingDir := filesystem.GetWorkingDir()
+	if !config.DevConfigActive() {
+		var envActive string = env.F.GetActive(env.F{}, false)
+		var envActiveTitle string = env.F.GetActive(env.F{}, true)
+		var workingDir string = filesystem.GetWorkingDir(false)
 		if workingDir != f.getOSInstallDir() {
-			sel := terminal.GetUserSelection("Do you want to install "+envActiveTitle+"?", []string{}, false, true)
+			var sel string = terminal.GetUserSelection("Do you want to install "+envActiveTitle+"?", []string{}, false, true)
 			if sel == "Yes" {
 				f.install(workingDir, envActive, envActiveTitle)
 				terminal.Exit(0, "")
@@ -39,13 +38,13 @@ func (f F) install(workingDir, envActive, envActiveTitle string) {
 	setupFilePath := workingDir + exec
 	installFilePath := f.getOSInstallDir() + exec
 	var aborted bool
-	sel := terminal.GetUserSelection("Do you want to proceed with the installation process?", []string{}, false, true)
+	var sel string = terminal.GetUserSelection("Do you want to proceed with the installation process?", []string{}, false, true)
 	if sel == "Yes" {
 		filesystem.Delete(installFilePath, true)
 		if !aborted {
 			filesystem.Copy(setupFilePath, installFilePath, true)
 			filesystem.GiveProgramPermissions(f.getOSInstallDir(), runtime.F.GetOSUsername(runtime.F{}))
-			sel := terminal.GetUserSelection("Do you want to delete the setup file?", []string{}, false, true)
+			var sel string = terminal.GetUserSelection("Do you want to delete the setup file?", []string{}, false, true)
 			if sel == "Yes" {
 				filesystem.Delete(setupFilePath, false)
 			}

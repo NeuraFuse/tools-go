@@ -5,14 +5,14 @@ import (
 	"fmt"
 	"strconv"
 
-	"../../errors"
-	"../../logging"
-	"../../objects/strings"
-	"../../runtime"
-	"../../vars"
-	"../client"
-	"../namespaces"
-	"./templates"
+	"github.com/neurafuse/tools-go/errors"
+	"github.com/neurafuse/tools-go/kubernetes/client"
+	"github.com/neurafuse/tools-go/kubernetes/namespaces"
+	"github.com/neurafuse/tools-go/kubernetes/volumes/templates"
+	"github.com/neurafuse/tools-go/logging"
+	"github.com/neurafuse/tools-go/objects/strings"
+	"github.com/neurafuse/tools-go/runtime"
+	"github.com/neurafuse/tools-go/vars"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	corev1typed "k8s.io/client-go/kubernetes/typed/core/v1"
 )
@@ -121,7 +121,6 @@ func (f F) Delete(namespace, contextID string, volumes [][]string) {
 }
 
 func (f F) Exists(namespace, contextID string) bool {
-	contextID = contextID + "-1"
 	if !strings.ArrayContains(f.Get(namespace, "pvc", false), "pvc-"+contextID) {
 		return false
 	} else if !strings.ArrayContains(f.Get(namespace, "pv", false), "pv-"+contextID) {

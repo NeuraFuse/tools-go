@@ -6,11 +6,11 @@ import (
 	"strconv"
 	"strings"
 
-	"../../errors"
-	"../../logging"
-	"../../runtime"
-	"../../vars"
-	"../client"
+	"github.com/neurafuse/tools-go/errors"
+	"github.com/neurafuse/tools-go/kubernetes/client"
+	"github.com/neurafuse/tools-go/logging"
+	"github.com/neurafuse/tools-go/runtime"
+	"github.com/neurafuse/tools-go/vars"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	corev1typed "k8s.io/client-go/kubernetes/typed/core/v1"
 )

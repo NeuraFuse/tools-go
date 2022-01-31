@@ -4,10 +4,10 @@ import (
 	"regexp"
 	"unicode"
 
-	"../../errors"
-	"../../objects/strings"
-	"../../runtime"
 	"github.com/microcosm-cc/bluemonday"
+	"github.com/neurafuse/tools-go/errors"
+	"github.com/neurafuse/tools-go/objects/strings"
+	"github.com/neurafuse/tools-go/runtime"
 )
 
 func SentenceMaxWords(text string, max int) string {
@@ -20,7 +20,7 @@ func SentenceMaxWords(text string, max int) string {
 
 func getSentenceMaxWords(text string) int {
 	maxWords, nWords := 0, 0
-	inWord := false
+	var inWord bool
 	for _, r := range text {
 		switch r {
 		case '.', '?', '!':
@@ -72,7 +72,7 @@ func UnrealWords(text string) string { // TODO: Refactor loops @WordsLength
 	for _, sentence := range sentences {
 		words := strings.SentenceToWords(sentence)
 		for _, word := range words {
-			save := true
+			var save bool = true
 			var arLetter []rune
 			for _, letter := range word {
 				arLetter = append(arLetter, letter)
@@ -156,40 +156,40 @@ func DuplicateLines(text, contentNew, sep string) string {
 	textSent := strings.Split(text, sep)
 	contentNewSent := strings.Split(contentNew, sep)
 	/*
-	var contentNewFiltered []string
-	for _, sentenceNew := range contentNewSent {
-		//if !strings.ArrayContains(contentNewSent, sentence) { // TODO: Abstract via ArrayArrayContains
-		var add bool = true
-		for _, sentence := range textSent {
-			if sentence == sentenceNew {
-				add = false
+		var contentNewFiltered []string
+		for _, sentenceNew := range contentNewSent {
+			//if !strings.ArrayContains(contentNewSent, sentence) { // TODO: Abstract via ArrayArrayContains
+			var add bool = true
+			for _, sentence := range textSent {
+				if sentence == sentenceNew {
+					add = false
+				}
+				//contentNewSent = strings.ArrayRemoveString(contentNewSent, sentence)
 			}
-			//contentNewSent = strings.ArrayRemoveString(contentNewSent, sentence)
-		}
-		if add {
-			contentNewFiltered = append(contentNewFiltered, sentenceNew)
-		}
-		textSent = append(textSent, contentNewFiltered...)
-	}*/
+			if add {
+				contentNewFiltered = append(contentNewFiltered, sentenceNew)
+			}
+			textSent = append(textSent, contentNewFiltered...)
+		}*/
 	textSent = append(textSent, contentNewSent...)
 	return strings.Join(unique(textSent), sep)
 }
 
 func unique(stringSlice []string) []string {
-    keys := make(map[string]bool)
-    list := []string{} 
-    for _, entry := range stringSlice {
-        if _, value := keys[entry]; !value {
-            keys[entry] = true
-            list = append(list, entry)
-        }
-    }    
-    return list
+	keys := make(map[string]bool)
+	list := []string{}
+	for _, entry := range stringSlice {
+		if _, value := keys[entry]; !value {
+			keys[entry] = true
+			list = append(list, entry)
+		}
+	}
+	return list
 }
 
 func TrimSpaceMultiline(text, sep string) string {
 	lines := strings.ToArray(text, sep)
-	output := ""
+	var output string
 	for i, line := range lines {
 		if i != 0 {
 			output = output + "\n"

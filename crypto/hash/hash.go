@@ -1,13 +1,13 @@
 package hash
 
 import (
-	"os"
 	"crypto/sha256"
+	"github.com/neurafuse/tools-go/errors"
+	"github.com/neurafuse/tools-go/runtime"
 	"io"
-	"../../errors"
-	"../../runtime"
-	//"../../filesystem"
-	"../../objects/strings"
+	"os"
+	//"github.com/neurafuse/tools-go/filesystem"
+	"github.com/neurafuse/tools-go/objects/strings"
 	"golang.org/x/mod/sumdb/dirhash"
 )
 
@@ -19,7 +19,7 @@ func SHA256Folder(dirPath string) string {
 
 func SHA256File(filePath string) string { // TODO: Bugfix
 	f, err := os.Open(filePath)
-	errMsg := "Unable to generate SHA-256 hash for file: "+filePath+"!"
+	errMsg := "Unable to generate SHA-256 hash for file: " + filePath + "!"
 	errors.Check(err, runtime.F.GetCallerInfo(runtime.F{}, false), errMsg, false, true, true)
 	defer f.Close()
 	h := sha256.New()

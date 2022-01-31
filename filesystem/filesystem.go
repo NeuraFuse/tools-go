@@ -12,11 +12,11 @@ import (
 	"path"
 	"path/filepath"
 
-	"../errors"
-	"../objects/strings"
-	ostrings "../objects/strings"
-	osTools "../os"
-	"../runtime"
+	"github.com/neurafuse/tools-go/errors"
+	"github.com/neurafuse/tools-go/objects/strings"
+	ostrings "github.com/neurafuse/tools-go/objects/strings"
+	osTools "github.com/neurafuse/tools-go/os"
+	"github.com/neurafuse/tools-go/runtime"
 	copy "github.com/otiai10/copy"
 )
 
@@ -108,8 +108,8 @@ func Delete(path string, sudo bool) {
 }
 
 func Exists(filePath string) bool {
-	absPath := GetAbsolutePathToFile(filePath)
-	exists := false
+	var absPath string = GetAbsolutePathToFile(filePath)
+	var exists bool
 	if _, err := os.Stat(absPath); !(os.IsNotExist(err)) {
 		exists = true
 	}
@@ -165,16 +165,24 @@ func CreateEmptyFile(filePath string) {
 	errors.Check(err, runtime.F.GetCallerInfo(runtime.F{}, false), "Unable to write empty file!", false, false, true)
 }
 
-func SaveByteArrayToFile(byteArray []byte, filePath string) {
+func SaveByteArrayToFile(byteArray []byte, filePath string) error {
 	createFolderFromFilePath(filePath)
-	err := ioutil.WriteFile(filePath, byteArray, GetFileMode())
+	var err error = ioutil.WriteFile(filePath, byteArray, GetFileMode())
 	errors.Check(err, runtime.F.GetCallerInfo(runtime.F{}, false), "Unable to save byte array to file: "+filePath+" !", false, false, true)
+	return err
 }
 
 func createFolderFromFilePath(filePath string) {
 	if !Exists(filePath) {
 		CreateDir(GetDirPathFromFilePath(filePath), false)
 	}
+}
+
+func GetLastFolderFromPath(filePath string) string {
+	var lastFolder string
+	var filePathAr []string = strings.Split(filePath, "/")
+	lastFolder = filePathAr[len(filePathAr)-2]
+	return lastFolder
 }
 
 func GetDirPathFromFilePath(filePath string) string {
@@ -201,6 +209,15 @@ func FileToBytes(filePath string) []byte {
 	byteArray, err := ioutil.ReadFile(filename)
 	errors.Check(err, runtime.F.GetCallerInfo(runtime.F{}, false), "Unable to load file to byte array: "+filePath+" !", false, false, true)
 	return byteArray
+}
+
+func FileContentEmpty(filePath string) bool {
+	var empty bool
+	var fileContent string = FileToString(filePath)
+	if fileContent == "" {
+		empty = true
+	}
+	return empty
 }
 
 func RenameFile(filePathOld string, filePathNew string) {
@@ -242,8 +259,8 @@ func filterFiles(input []string, filter string, filterOnly bool) []string {
 			filterCond = strings.HasSuffix(entry, filter)
 		} else {
 			filterCond = !strings.HasSuffix(entry, filter)
-			if filter == "." {
-				filterCond = !strings.HasPrefix(entry, filter)
+			if filter == "hidden" {
+				filterCond = !strings.HasPrefix(entry, ".")
 			}
 		}
 		if filterCond {
@@ -271,18 +288,30 @@ func CreateDir(dirPath string, sudo bool) error {
 }
 
 func DirIsEmpty(path string) bool {
-	f, err := os.Open(path)
-	errors.Check(err, runtime.F.GetCallerInfo(runtime.F{}, false), "Unable to open directory: "+path+" !", false, false, true)
-	defer f.Close()
-	_, err = f.Readdirnames(1) // Or f.Readdir(1)
-	if err == io.EOF {
+	if Exists(path) {
+		f, err := os.Open(path)
+		errors.Check(err, runtime.F.GetCallerInfo(runtime.F{}, false), "Unable to open directory: "+path+" !", false, false, true)
+		defer f.Close()
+		_, err = f.Readdirnames(1) // Or f.Readdir(1)
+		if err == io.EOF {
+			return true
+		}
+		return false // Either not empty or error, suits both cases
+	} else {
 		return true
 	}
-	return false // Either not empty or error, suits both cases
 }
 
-func GetWorkingDir() string {
+func GetWorkingDir(folderOnly bool) string {
 	dir, err := os.Getwd()
-	errors.Check(err, runtime.F.GetCallerInfo(runtime.F{}, false), "", false, false, true)
-	return dir + "/"
+	errors.Check(err, runtime.F.GetCallerInfo(runtime.F{}, false), "Unable to get current working directory!", false, false, true)
+	dir = dir + "/"
+	if folderOnly {
+		dir = GetFileNameFromDirPath(dir)
+	}
+	return dir
+}
+
+func GetWorkspaceFolderVar() string {
+	return "${workspaceFolder}"
 }

@@ -5,24 +5,24 @@ import (
 	"fmt"
 	"strconv"
 
-	"../../errors"
-	"../../logging"
-	"../../objects/strings"
-	"../../runtime"
-	"../../timing"
-	"../../vars"
-	"../client"
-	"../namespaces"
-	"./templates"
+	"github.com/neurafuse/tools-go/errors"
+	"github.com/neurafuse/tools-go/kubernetes/client"
+	"github.com/neurafuse/tools-go/kubernetes/deployments/templates"
+	"github.com/neurafuse/tools-go/kubernetes/namespaces"
+	"github.com/neurafuse/tools-go/logging"
+	"github.com/neurafuse/tools-go/objects/strings"
+	"github.com/neurafuse/tools-go/runtime"
+	"github.com/neurafuse/tools-go/timing"
+	"github.com/neurafuse/tools-go/vars"
+	apiApps "k8s.io/api/apps/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	appsv1typed "k8s.io/client-go/kubernetes/typed/apps/v1"
-	apiApps "k8s.io/api/apps/v1"
 )
 
 type F struct{}
 
-func (f F) GetList(namespace string, logResult bool) []string {
-	client := f.getClient(namespace)
+func (f F) Get(namespace string, logResult bool) []string {
+	var client appsv1typed.DeploymentInterface = f.getClient(namespace)
 	list, err := client.List(contextPack.TODO(), metav1.ListOptions{})
 	var deployments []string
 	if !errors.Check(err, runtime.F.GetCallerInfo(runtime.F{}, false), "Unable to get deployment in namespace "+namespace+":", false, false, true) {
@@ -52,13 +52,15 @@ func (f F) GetID(namespace, contextID string) *apiApps.Deployment {
 }
 
 func (f F) Create(namespace, contextID, imageAddrs, serviceCluster, resources string, volumes, containerPort [][]string) {
-	client := f.getClient(namespace)
-	deployment := templates.GetConfig(contextID, imageAddrs, serviceCluster, resources, volumes, containerPort)
-	_, err := client.Create(contextPack.TODO(), deployment, metav1.CreateOptions{})
-	if !errors.Check(err, runtime.F.GetCallerInfo(runtime.F{}, false), ""+contextID+" already exists.", false, false, true) {
-		logging.Log([]string{"", vars.EmojiKubernetes, vars.EmojiSuccess}, "Created deployment "+contextID+".", 0)
+	if !f.Exists(namespace, contextID) {
+		client := f.getClient(namespace)
+		deployment := templates.GetConfig(contextID, imageAddrs, serviceCluster, resources, volumes, containerPort)
+		_, err := client.Create(contextPack.TODO(), deployment, metav1.CreateOptions{})
+		if !errors.Check(err, runtime.F.GetCallerInfo(runtime.F{}, false), "Unable to create deployment "+contextID+"!", false, false, true) {
+			logging.Log([]string{"", vars.EmojiKubernetes, vars.EmojiSuccess}, "Created deployment "+contextID+".", 0)
+		}
 	} else {
-		logging.Log([]string{"", vars.EmojiKubernetes, vars.EmojiWarning}, "Fail recovery: Deployment recreation..", 0)
+		logging.Log([]string{"", vars.EmojiKubernetes, vars.EmojiSuccess}, "Deployment recreation..", 0)
 		f.Delete(namespace, contextID)
 		f.Create(namespace, contextID, imageAddrs, serviceCluster, resources, volumes, containerPort)
 	}
@@ -72,12 +74,12 @@ func (f F) Delete(namespace, contextID string) {
 	}); err != nil {
 		errors.Check(nil, runtime.F.GetCallerInfo(runtime.F{}, false), contextID+" already deleted.", true, false, true)
 	} else {
-		var success bool = false
+		var success bool
 		logging.ProgressSpinner("start")
 		for ok := true; ok; ok = !success {
-			if strings.ArrayContains(f.GetList(namespace, false), contextID) {
+			if strings.ArrayContains(f.Get(namespace, false), contextID) {
 				logging.Log([]string{"", vars.EmojiKubernetes, vars.EmojiWaiting}, "Waiting for the deployment "+contextID+" to be deleted..", 0)
-				timing.TimeOut(1, "s")
+				timing.Sleep(1, "s")
 			} else {
 				success = true
 				logging.ProgressSpinner("stop")
@@ -88,7 +90,7 @@ func (f F) Delete(namespace, contextID string) {
 }
 
 func (f F) Exists(namespace, contextID string) bool {
-	return strings.ArrayContains(f.GetList(namespace, false), contextID)
+	return strings.ArrayContains(f.Get(namespace, false), contextID)
 }
 
 func (f F) getClient(namespace string) appsv1typed.DeploymentInterface {

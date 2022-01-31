@@ -1,3 +1,3 @@
-# ToolSet for golang
+# Basic golang tools
 
-tools-go provides various universal functionalities for all golang based NeuraFuse products.
+tools-go provides various universal golang functionalities.

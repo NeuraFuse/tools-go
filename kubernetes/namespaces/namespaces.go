@@ -5,12 +5,12 @@ import (
 	"fmt"
 	"strconv"
 
-	"../../errors"
-	"../../logging"
-	"../../objects/strings"
-	"../../runtime"
-	"../../vars"
-	"../client"
+	"github.com/neurafuse/tools-go/errors"
+	"github.com/neurafuse/tools-go/kubernetes/client"
+	"github.com/neurafuse/tools-go/logging"
+	"github.com/neurafuse/tools-go/objects/strings"
+	"github.com/neurafuse/tools-go/runtime"
+	"github.com/neurafuse/tools-go/vars"
 	apiv1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	corev1typed "k8s.io/client-go/kubernetes/typed/core/v1"
@@ -24,10 +24,12 @@ func (f F) Init() {
 	f.Create(Default)
 }
 
-func (f F) Get(logResult bool) []string {
-	list, err := f.getClient().List(context.TODO(), metav1.ListOptions{})
+func (f F) Get(logResult bool) (error, []string) {
+	var err error
+	var list *apiv1.NamespaceList
 	var namespaces []string
-	if !errors.Check(err, runtime.F.GetCallerInfo(runtime.F{}, false), "Unable to get "+runtime.F.GetCallerInfo(runtime.F{}, true)+"!", false, true, true) {
+	list, err = f.getClient().List(context.TODO(), metav1.ListOptions{})
+	if !errors.Check(err, runtime.F.GetCallerInfo(runtime.F{}, false), "Unable to get "+runtime.F.GetCallerInfo(runtime.F{}, true)+"!", false, false, true) {
 		if logResult {
 			logging.Log([]string{"\n", vars.EmojiKubernetes, vars.EmojiInfo}, strings.Title(runtime.F.GetCallerInfo(runtime.F{}, true))+":", 0)
 			if len(list.Items) == 0 {
@@ -42,7 +44,7 @@ func (f F) Get(logResult bool) []string {
 			namespaces = append(namespaces, n.Name)
 		}
 	}
-	return namespaces
+	return err, namespaces
 }
 
 func (f F) Create(id string) {
@@ -82,7 +84,9 @@ func (f F) filter(ns []apiv1.Namespace, filter []string) []string {
 }
 
 func (f F) Exists(id string) bool {
-	return strings.ArrayContains(f.Get(false), id)
+	var list []string
+	_, list = f.Get(false)
+	return strings.ArrayContains(list, id)
 }
 
 func (f F) getClient() corev1typed.NamespaceInterface {

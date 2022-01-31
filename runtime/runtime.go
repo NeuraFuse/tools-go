@@ -7,7 +7,7 @@ import (
 	"runtime"
 	"strings"
 
-	"../errors"
+	"github.com/neurafuse/tools-go/errors"
 )
 
 type F struct{}

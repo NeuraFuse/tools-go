@@ -12,20 +12,22 @@ import (
 	"io/ioutil"
 	"os"
 
-	gcloudClient "../../../../neurakube/infrastructure/providers/gcloud/clients"
-	"../../../config"
-	"../../../env"
-	"../../../errors"
-	"../../../exec"
-	"../../../logging"
-	"../../../objects/strings"
-	"../../../runtime"
-	"../../../timing"
-	"../../../vars"
+	gcloudClient "github.com/neurafuse/tools-go/cloud/providers/gcloud/clients"
+	"github.com/neurafuse/tools-go/config"
+	infraConfig "github.com/neurafuse/tools-go/config/infrastructure"
+	"github.com/neurafuse/tools-go/env"
+	"github.com/neurafuse/tools-go/errors"
+	"github.com/neurafuse/tools-go/exec"
+
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/client"
 	"github.com/docker/docker/pkg/archive"
+	"github.com/neurafuse/tools-go/logging"
+	"github.com/neurafuse/tools-go/objects/strings"
+	"github.com/neurafuse/tools-go/runtime"
+	"github.com/neurafuse/tools-go/timing"
+	"github.com/neurafuse/tools-go/vars"
 )
 
 var contextPack string = env.F.GetContext(env.F{}, runtime.F.GetCallerInfo(runtime.F{}, true), false)
@@ -74,7 +76,7 @@ func responseHandler(reader io.ReadCloser) error {
 		} else if err != nil {
 			return err
 		}
-		logging.Log([]string{"", vars.EmojiContainer, vars.EmojiInfo}, string(n), 1)
+		logging.Log([]string{"", vars.EmojiContainer, vars.EmojiInfo}, string(n), 0)
 	}
 	fmt.Println()
 	return nil
@@ -97,12 +99,11 @@ func Initialize(release bool) {
 		configID = "dev"
 	} else {
 		configID = "project"
-		switch vars.InfraProviderActive {
-			case "gcloud":
-				if !config.ValidSettings(configID, "containers", false) {
-					config.Setting("set", configID, configKeyPrefix+"Username", "_json_key")
-					config.Setting("set", configID, configKeyPrefix+"Password", gcloudClient.F.GetServiceAccount(gcloudClient.F{}))
-				}
+		if infraConfig.F.ProviderIDIsActive(infraConfig.F{}, "gcloud") {
+			if !config.ValidSettings(configID, "containers/registry", false) {
+				config.Setting("set", configID, configKeyPrefix+"Username", "_json_key")
+				config.Setting("set", configID, configKeyPrefix+"Password", gcloudClient.F.GetServiceAccount(gcloudClient.F{}))
+			}
 		}
 	}
 	username = config.Setting("get", configID, configKeyPrefix+"Username", "")
@@ -117,7 +118,7 @@ func SetRegistryCred(username, password string) {
 
 func GetAuth() string {
 	encodedJSON, err := json.Marshal(GetAuthConfig())
-	errors.Check(err, runtime.F.GetCallerInfo(runtime.F{}, false), "Unable to get "+contextPack+" registry auth!", false, false, true)
+	errors.Check(err, runtime.F.GetCallerInfo(runtime.F{}, false), "Unable to get "+contextPack+" registry auth.!", false, false, true)
 	return base64.URLEncoding.EncodeToString(encodedJSON)
 }
 
@@ -184,8 +185,8 @@ func daemon(action string) {
 	if action == "start" {
 		logging.Log([]string{"", vars.EmojiContainer, vars.EmojiWaiting}, "Starting "+contextPack+" daemon..", 0)
 		ctx, client := createClient()
-		var success bool = false
-		var triggeredStart bool = false
+		var success bool
+		var triggeredStart bool
 		for ok := true; ok; ok = !success {
 			ping, err := client.Ping(ctx)
 			if errors.Check(err, runtime.F.GetCallerInfo(runtime.F{}, false), "", false, false, false) {
@@ -199,7 +200,7 @@ func daemon(action string) {
 				success = true
 				logging.Log([]string{"", vars.EmojiContainer, vars.EmojiSuccess}, "Docker daemon running (v"+ping.APIVersion+").\n", 0)
 			}
-			timing.TimeOut(200, "ms")
+			timing.Sleep(200, "ms")
 		}
 	}
 }

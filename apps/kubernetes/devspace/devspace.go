@@ -1,54 +1,81 @@
 package devspace
 
 import (
-	"../../../config"
-	"../../../env"
-	"../../../errors"
-	"../../../exec"
-	"../../../filesystem"
-	"../../../io"
-	"../../../logging"
-	"../../../projects"
-	"../../../readers/yaml"
-	"../../../runtime"
-	"../../../vars"
-	"./templates"
+	"github.com/neurafuse/tools-go/apps/kubernetes/devspace/templates"
+	"github.com/neurafuse/tools-go/config"
+	"github.com/neurafuse/tools-go/container"
+	"github.com/neurafuse/tools-go/env"
+	"github.com/neurafuse/tools-go/errors"
+	"github.com/neurafuse/tools-go/exec"
+	"github.com/neurafuse/tools-go/filesystem"
+	"github.com/neurafuse/tools-go/io"
+	"github.com/neurafuse/tools-go/logging"
+	"github.com/neurafuse/tools-go/readers/yaml"
+	"github.com/neurafuse/tools-go/runtime"
+	"github.com/neurafuse/tools-go/vars"
 )
 
 type F struct{}
 
 var context string = env.F.GetContext(env.F{}, runtime.F.GetCallerInfo(runtime.F{}, true), false)
 
-func (f F) Sync(context, namespace, imageAddrs string, thread bool) {
+func (f F) Sync(contextID, namespace, imageAddrs string, thread bool) {
 	logging.Log([]string{"", vars.EmojiKubernetes, vars.EmojiProcess}, "Preparing file synchronization..", 0)
 	//devspace.Sync(createDevSpaceConfig(templateBasePath, templatePath))
-	configPath := f.createDevSpaceConfig(context, namespace, imageAddrs)
+	configPath := f.createDevSpaceConfig(contextID, namespace, imageAddrs)
 	f.syncExec(configPath, thread)
 }
 
-func (f F) createDevSpaceConfig(context, namespace, imageAddrs string) string {
-	logging.Log([]string{"", vars.EmojiKubernetes, vars.EmojiProcess}, "Creating devspace configs..", 0)
-	configInt := f.getConfigInterface(context, f.getTemplateBasePath(), f.getPath("template"), namespace, imageAddrs)
+func (f F) createDevSpaceConfig(contextID, namespace, imageAddrs string) string {
+	configInt := f.getConfigInterface(contextID, f.getTemplateBasePath(), f.getPath("template"), namespace, imageAddrs)
 	projectConfigPath := f.getPath("projectconfig")
 	if filesystem.Exists(projectConfigPath) {
 		filesystem.Delete(projectConfigPath, false)
 	}
 	yaml.StructToFile(projectConfigPath, configInt)
+	logging.Log([]string{"", vars.EmojiKubernetes, vars.EmojiSuccess}, "Created devspace configs.", 0)
 	return projectConfigPath
 }
 
-func (f F) getConfigInterface(context, templateBasePath, templatePath, namespace, imageAddrs string) interface{} {
+func (f F) getConfigInterface(contextID, templateBasePath, templatePath, namespace, imageAddrs string) interface{} {
 	dConfig := yaml.FileToStruct(templateBasePath+templatePath, &templates.Default{})
-	repoPreamble := config.Setting("get", "dev", "Spec.Containers.Registry.Address", "")
+	var repoPreamble string = config.Setting("get", "dev", "Spec.Containers.Registry.Address", "")
 	dConfig.(*templates.Default).Images.Remote.Image = repoPreamble + imageAddrs
-	dConfig.(*templates.Default).Dev.Sync[0].ImageName = context
-	dConfig.(*templates.Default).Dev.Sync[0].Namespace = namespace
-	dConfig.(*templates.Default).Dev.Sync[0].ExcludePaths = []string{"lost+found"}
+	var sync []struct {
+		ImageName     string   "json:\"imageName\""
+		Namespace     string   "json:\"namespace\""
+		LocalSubPath  string   "json:\"localSubPath\""
+		ContainerPath string   "json:\"containerPath\""
+		ExcludePaths  []string "json:\"excludePaths\""
+	}
+	var syncEntry struct {
+		ImageName     string   "json:\"imageName\""
+		Namespace     string   "json:\"namespace\""
+		LocalSubPath  string   "json:\"localSubPath\""
+		ContainerPath string   "json:\"containerPath\""
+		ExcludePaths  []string "json:\"excludePaths\""
+	}
+	syncEntry.ImageName = "remote"
+	syncEntry.Namespace = namespace
+	var localAppRoot string = config.Setting("get", "project", "Spec.Containers.Sync.PathMappings.LocalAppRoot", "")
+	if localAppRoot == filesystem.GetWorkspaceFolderVar() {
+		localAppRoot = ""
+	}
+	syncEntry.LocalSubPath = localAppRoot
+	var containerAppRoot string = config.Setting("get", "project", "Spec.Containers.Sync.PathMappings.ContainerAppRoot", "")
+	syncEntry.ContainerPath = containerAppRoot
+	syncEntry.ExcludePaths = []string{container.F.GetVolumeMountPath(container.F{}) + "training/input"}
+	sync = append(sync, syncEntry)
+	//dConfig.(*templates.Default).Dev.Sync[0].ImageName = context
+	//dConfig.(*templates.Default).Dev.Sync[0].Namespace = namespace
+	//dConfig.(*templates.Default).Dev.Sync[0].ExcludePaths = []string{"lost+found"}
+	dConfig.(*templates.Default).Dev.Sync = sync
+	dConfig.(*templates.Default).Version = "v1beta9"
 	return dConfig
 }
 
 func (f F) getBasePath() string {
-	var basePath string = "../tools-go/apps/kubernetes/devspace/"
+	var basePath string = "../tools-go@" + vars.ToolsGoVersion + "/apps/kubernetes/devspace/"
 	return basePath
 }
 
@@ -66,7 +93,7 @@ func (f F) getPath(id string) string {
 		}
 	case "projectconfig":
 		{
-			path = projects.F.GetWorkingDir(projects.F{}) + context + "/" + context + ext
+			path = filesystem.GetWorkingDir(false) + "." + context + "/" + context + ext
 		}
 	}
 	return path
@@ -108,7 +135,7 @@ func (f F) install() {
 	logging.Log([]string{"", vars.EmojiKubernetes, vars.EmojiProcess}, "Installing DevSpace..", 0)
 	var err error = f.downloadSetupFile()
 	if !errors.Check(err, runtime.F.GetCallerInfo(runtime.F{}, false), "Unable to download setup file!", false, false, true) {
-		filesystem.Move(f.getSetupFilePath(), f.getInstallPath(), false)
+		filesystem.Move(f.getSetupFilePath(), f.getInstallPath(), true)
 		filesystem.GiveProgramPermissions(f.getInstallPath(), runtime.F.GetOSUsername(runtime.F{}))
 	}
 }

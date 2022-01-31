@@ -4,16 +4,19 @@ import (
 	"context"
 
 	client ".."
-	"../../../config"
-	"../../../errors"
-	"../../../filesystem"
-	"../../../logging"
-	"../../../runtime"
-	"../../../vars"
+	"github.com/neurafuse/tools-go/config"
+	"github.com/neurafuse/tools-go/errors"
+	"github.com/neurafuse/tools-go/filesystem"
+	"github.com/neurafuse/tools-go/logging"
+	"github.com/neurafuse/tools-go/runtime"
+	"github.com/neurafuse/tools-go/vars"
 	apiv1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
+
+	// _ "k8s.io/client-go/plugin/pkg/client/auth" TODO: Load all known auth plugins
+	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
 )
 
 type F struct{}
@@ -23,9 +26,9 @@ func (f F) Create(namespace string) { // TODO: Test compatibility for selfhosted
 	secret, err := f.getSecret()
 	if !errors.Check(err, runtime.F.GetCallerInfo(runtime.F{}, false), "There are not existing secrets for the namespace "+namespace+" to create a kubeconfig!", false, false, true) {
 		clusters, clusterName := f.getClusters(secret)
-		contexts := f.getContexts(clusterName, namespace)
-		authinfos := f.getAuthInfos(namespace, secret)
-		clientConfig := f.getClientConfig(clusters, contexts, authinfos)
+		var contexts map[string]*clientcmdapi.Context = f.getContexts(clusterName, namespace)
+		var authinfos map[string]*clientcmdapi.AuthInfo = f.getAuthInfos(namespace, secret)
+		var clientConfig clientcmdapi.Config = f.getClientConfig(clusters, contexts, authinfos)
 		f.save(clientConfig)
 	}
 }
@@ -46,7 +49,7 @@ func (f F) getSecret() (apiv1.Secret, error) {
 
 func (f F) getClusters(secret apiv1.Secret) (map[string]*clientcmdapi.Cluster, string) {
 	clusters := make(map[string]*clientcmdapi.Cluster)
-	clusterName := config.Setting("get", "infrastructure", "Spec.Cluster.Name", "")
+	clusterName := config.Setting("get", "infrastructure", "Spec.Cluster.ID", "")
 	clusters[clusterName] = &clientcmdapi.Cluster{
 		Server:                   "https://" + client.F.GetRestConfig(client.F{}).Host,
 		CertificateAuthorityData: secret.Data["ca.crt"],
@@ -66,7 +69,7 @@ func (f F) getContexts(clusterName, namespace string) map[string]*clientcmdapi.C
 
 func (f F) getAuthInfos(namespace string, secret apiv1.Secret) map[string]*clientcmdapi.AuthInfo {
 	authinfos := make(map[string]*clientcmdapi.AuthInfo)
-	if vars.InfraProviderActive == vars.InfraProviderGcloud {
+	if infraConfig.F.ProviderIDIsActive(infraConfig.F{}, "gcloud") {
 		authinfos[namespace] = &clientcmdapi.AuthInfo{
 			//Token: string(secret.Data["token"]),
 			AuthProvider: &clientcmdapi.AuthProviderConfig{
@@ -74,7 +77,7 @@ func (f F) getAuthInfos(namespace string, secret apiv1.Secret) map[string]*clien
 				Config: f.getAuthProviderConfig(),
 			},
 		}
-	} else if vars.InfraProviderActive == vars.InfraProviderSelfHosted {
+	} else if infraConfig.F.ProviderIDIsActive(infraConfig.F{}, "selfhosted") {
 		authinfos[namespace] = &clientcmdapi.AuthInfo{
 			Token: string(secret.Data["token"]),
 		}
@@ -84,7 +87,7 @@ func (f F) getAuthInfos(namespace string, secret apiv1.Secret) map[string]*clien
 
 func (f F) getAuthProviderConfig() map[string]string {
 	config := make(map[string]string)
-	if vars.InfraProviderActive == vars.InfraProviderGcloud {
+	if infraConfig.F.ProviderIDIsActive(infraConfig.F{}, "gcloud") {
 		config["cmd-args"] = "config config-helper --format=json"
 		config["cmd-path"] = "/Users/djw/google-cloud-sdk/bin/gcloud"
 		config["expiry-key"] = "{.credential.token_expiry}"

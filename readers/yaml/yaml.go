@@ -1,10 +1,10 @@
 package yaml
 
 import (
-	"../../../tools-go/errors"
-	"../../../tools-go/filesystem"
-	"../../../tools-go/runtime"
 	"github.com/ghodss/yaml"
+	"github.com/neurafuse/tools-go/errors"
+	"github.com/neurafuse/tools-go/filesystem"
+	"github.com/neurafuse/tools-go/runtime"
 	yamlv2 "gopkg.in/yaml.v2"
 )
 

@@ -1,21 +1,27 @@
 package portforward
 
 import (
-	"flag"
+	// "flag"
 	"fmt"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/client-go/rest"
-	"k8s.io/client-go/tools/clientcmd"
+	// "k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/tools/portforward"
 	"k8s.io/client-go/transport/spdy"
 	"net/http"
 	"net/url"
 	"os"
 	"os/signal"
-	"path/filepath"
-	"strings"
+	// "path/filepath"
+	"github.com/neurafuse/tools-go/kubernetes/client"
+	"github.com/neurafuse/tools-go/vars"
+	"github.com/neurafuse/tools-go/logging"
+	"github.com/neurafuse/tools-go/errors"
+	"github.com/neurafuse/tools-go/runtime"
+	"github.com/neurafuse/tools-go/objects/strings"
+	goStrings "strings"
 	"sync"
 	"syscall"
 )
@@ -37,7 +43,8 @@ type PortForwardAPodRequest struct {
 	ReadyCh chan struct{}
 }
 
-func Connect(podID string, localPort int, podPort int) {
+func Connect(namespace, podID string, localPort int, podPort int) {
+	var forwardDetails string = "localhost:"+strings.ToString(localPort)+" <-> "+podID+":"+strings.ToString(podPort)
 	var wg sync.WaitGroup
 	wg.Add(1)
 
@@ -61,20 +68,20 @@ func Connect(podID string, localPort int, podPort int) {
 	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
 	go func() {
 		<-sigs
-		fmt.Println("Bye...")
+		logging.Log([]string{"", vars.EmojiKubernetes, vars.EmojiInfo}, "Port-forwarding tunnel is going to be closed.", 0)
 		close(stopCh)
 		wg.Done()
 	}()
-
+	
 	go func() {
 		// PortForward the pod specified from its port 9090 to the local port
 		// 8080
 		err := PortForwardAPod(PortForwardAPodRequest{
-			RestConfig: client.GetAuth(),
+			RestConfig: client.F.GetRestConfig(client.F{}),
 			Pod: v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      podID,
-					Namespace: namespaces.Default,
+					Namespace: namespace,
 				},
 			},
 			LocalPort: localPort,
@@ -83,24 +90,21 @@ func Connect(podID string, localPort int, podPort int) {
 			StopCh:    stopCh,
 			ReadyCh:   readyCh,
 		})
-		if err != nil {
-			panic(err)
-		}
+		errors.Check(err, runtime.F.GetCallerInfo(runtime.F{}, false), "Unable to port-forward: "+forwardDetails, false, true, true)
 	}()
 
 	select {
 	case <-readyCh:
 		break
 	}
-	println("Port forwarding is ready to get traffic. have fun!")
-
+	logging.Log([]string{"", vars.EmojiKubernetes, vars.EmojiSuccess}, "Port-forwarding tunnel is ready.", 0)
+	logging.Log([]string{"", vars.EmojiKubernetes, vars.EmojiClient}, forwardDetails, 0)
 	wg.Wait()
 }
 
 func PortForwardAPod(req PortForwardAPodRequest) error {
-	path := fmt.Sprintf("/api/v1/namespaces/%s/pods/%s/portforward",
-		req.Pod.Namespace, req.Pod.Name)
-	hostIP := strings.TrimLeft(req.RestConfig.Host, "htps:/")
+	path := fmt.Sprintf("/api/v1/namespaces/%s/pods/%s/portforward", req.Pod.Namespace, req.Pod.Name)
+	hostIP := goStrings.TrimLeft(req.RestConfig.Host, "htps:/")
 
 	transport, upgrader, err := spdy.RoundTripperFor(req.RestConfig)
 	if err != nil {

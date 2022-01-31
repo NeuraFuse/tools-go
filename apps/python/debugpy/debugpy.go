@@ -1,3 +1,6 @@
 package debugpy
 
-var ContainerPorts []string = []string{"2000", "TCP"}
+func GetContainerPorts() []string {
+	var containerPorts []string = []string{"2000", "TCP"}
+	return containerPorts
+}

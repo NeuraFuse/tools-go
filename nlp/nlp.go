@@ -15,7 +15,7 @@ func VerbToAction(input string) string {
 }
 
 func ConvertToPlural(resourceType string) (string, bool) {
-	actionTypeMultiple := false
+	var actionTypeMultiple bool
 	if resourceType[len(resourceType)-1:] == "s" {
 		actionTypeMultiple = true
 	} else {

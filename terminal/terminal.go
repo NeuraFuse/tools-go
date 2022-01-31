@@ -6,18 +6,18 @@ import (
 	"os"
 	"os/signal"
 
-	buildconfig "../config/build"
-	"../env"
-	"../errors"
-	"../filesystem"
-	"../logging"
-	"../logging/color"
-	"../objects/strings"
-	"../runtime"
-	"../timing"
-	"../vars"
 	"github.com/common-nighthawk/go-figure"
 	"github.com/manifoldco/promptui"
+	buildconfig "github.com/neurafuse/tools-go/config/build"
+	"github.com/neurafuse/tools-go/env"
+	"github.com/neurafuse/tools-go/errors"
+	"github.com/neurafuse/tools-go/filesystem"
+	"github.com/neurafuse/tools-go/logging/color"
+	"github.com/neurafuse/tools-go/logging/emoji"
+	"github.com/neurafuse/tools-go/objects/strings"
+	"github.com/neurafuse/tools-go/runtime"
+	"github.com/neurafuse/tools-go/timing"
+	"github.com/neurafuse/tools-go/vars"
 )
 
 func Init(skipIntro bool) {
@@ -26,8 +26,8 @@ func Init(skipIntro bool) {
 }
 
 func UserSelectionFiles(label, objectType, filePath string, search, exclude []string, withAdd bool, returnAbsolutePath bool) string {
-	var success bool = false
-	var hintlogged bool = false
+	var success bool
+	var hintlogged bool
 	var fileList []string
 	if !filesystem.Exists(filePath) {
 		filesystem.CreateDir(filePath, false)
@@ -38,15 +38,15 @@ func UserSelectionFiles(label, objectType, filePath string, search, exclude []st
 			success = true
 		} else {
 			if !hintlogged {
-				logging.Log([]string{"\n", vars.EmojiDir, vars.EmojiInfo}, "No "+strings.Join(search, ", ")+" file found in: "+filePath, 0)
-				logging.Log([]string{"", vars.EmojiDir, vars.EmojiInfo}, "Please move a suitable file to this location.", 0)
-				logging.Log([]string{"", vars.EmojiDir, vars.EmojiInfo}, "Auto refreshing every second..", 0)
+				emoji.Println("\n", vars.EmojiDir, vars.EmojiInfo, "No "+strings.Join(search, ", ")+" file found in: "+filePath)
+				emoji.Println("", vars.EmojiDir, vars.EmojiInfo, "Please move a suitable file to this location.")
+				emoji.Println("", vars.EmojiDir, vars.EmojiInfo, "Auto refreshing every second..")
 				hintlogged = true
 			}
-			timing.TimeOut(200, "ms")
+			timing.Sleep(200, "ms")
 		}
 	}
-	var absolutePath string = ""
+	var absolutePath string
 	if returnAbsolutePath {
 		absolutePath = filePath + "/"
 	}
@@ -95,10 +95,10 @@ func GetUserSelection(label string, options []string, withAdd, binaryOptions boo
 		}
 	}
 	if errors.Check(err, runtime.F.GetCallerInfo(runtime.F{}, false), "", false, false, false) {
-		logging.Log([]string{"", vars.EmojiWarning, vars.EmojiInfo}, "Unable to get user selection via prompt!", 0)
+		emoji.Println("", vars.EmojiWarning, vars.EmojiInfo, "Unable to get user selection via prompt!")
 		if buildconfig.F.Setting(buildconfig.F{}, "get", "handover", false) {
-			logging.Log([]string{"", vars.EmojiWarning, vars.EmojiInfo}, "This occurs if the assistant gets called after a build handover.", 0)
-			logging.Log([]string{"", vars.EmojiWarning, vars.EmojiInfo}, "Please restart manually to workaround.\n", 0)
+			emoji.Println("", vars.EmojiWarning, vars.EmojiInfo, "This occurs if the assistant gets called after a build handover.")
+			emoji.Println("", vars.EmojiWarning, vars.EmojiInfo, "Please restart manually to workaround.\n")
 		}
 		Exit(0, "")
 	}
@@ -107,7 +107,7 @@ func GetUserSelection(label string, options []string, withAdd, binaryOptions boo
 
 func GetUserInput(instruction string) string {
 	reader := bufio.NewReader(os.Stdin)
-	logging.Log([]string{"", vars.EmojiInfo, ""}, instruction, 0)
+	emoji.Println("", vars.EmojiInfo, "", instruction)
 	input, err := reader.ReadString('\n')
 	errors.Check(err, runtime.F.GetCallerInfo(runtime.F{}, false), "Unable to get user input", false, true, true)
 	input = strings.TrimSuffix(input, "\n")
@@ -116,29 +116,39 @@ func GetUserInput(instruction string) string {
 
 func intro(skip bool) {
 	if !skip {
-		module := env.F.GetActive(env.F{}, false)
+		var module string = env.F.GetActive(env.F{}, false)
 		var asciiArtColor string
 		var licenseType string
 		var footer string
-		if module == vars.NeuraCLINameRepo {
+		if module == vars.NeuraCLINameID {
 			module = vars.NeuraCLIName
 			asciiArtColor = "cyan"
 			licenseType = vars.NeuraCLILicenseType
-			footer = "    " + vars.OrganizationName + " | " + vars.OrganizationWebsite + " | © " + licenseType+" ("+env.F.GetVersion(env.F{})+")"
-		} else if module == vars.NeuraKubeNameRepo {
+			footer = "     " + vars.OrganizationName + " | " + vars.OrganizationWebsite + " | © " + licenseType + " (" + env.F.GetVersion(env.F{}) + ")"
+		} else if module == vars.NeuraKubeNameID {
 			module = vars.NeuraKubeName
 			asciiArtColor = "cyan"
 			licenseType = vars.NeuraKubeLicenseType
-			footer = "       " + vars.OrganizationName + " | " + vars.OrganizationWebsite + " | © " + licenseType+" ("+env.F.GetVersion(env.F{})+")"
+			footer = "        " + vars.OrganizationName + " | " + vars.OrganizationWebsite + " | © " + licenseType + " (" + env.F.GetVersion(env.F{}) + ")"
 		}
 		fmt.Println()
 		printASCIIArt(module, "small", asciiArtColor)
 		//year := strings.ToString(timing.GetCurrent("year"))
 		fmt.Println(color.Red(footer))
-		logging.PartingLine()
+		partingLine()
 	} else {
 		fmt.Println("")
 	}
+}
+
+func partingLine() {
+	var line string
+	if env.F.CLI(env.F{}) {
+		line = "_____________________________________________________"
+	} else if env.F.API(env.F{}) {
+		line = "____________________________________________________________"
+	}
+	fmt.Println(line + "\n")
 }
 
 func printASCIIArt(text string, style string, color string) {
@@ -148,21 +158,19 @@ func printASCIIArt(text string, style string, color string) {
 
 func Exit(errorCode int, msg string) {
 	if !buildconfig.F.Setting(buildconfig.F{}, "get", "handover", false) {
-		var emoji string
-		var newline string
+		var emojiKey string
+		var newline string = "\n"
 		if errorCode == 0 {
-			emoji = vars.EmojiWavingHand
+			emojiKey = vars.EmojiWavingHand
 			msg = "Everything done."
 		} else if errorCode == 1 {
-			newline = "\n"
-			emoji = "upside_down_face"
-			msg = "Unfortunately an unexpected error occured on our side. Sorry for the inconvenience.\n"
+			emojiKey = "upside_down_face"
+			msg = "Unfortunately an unexpected error occured.\n"
 		} else if errorCode == 2 {
-			newline = "\n"
-			emoji = vars.EmojiWarning
+			emojiKey = vars.EmojiWarning
 			errorCode = 0
 		}
-		logging.Log([]string{newline, emoji, ""}, msg+"\n", 0)
+		emoji.Println(newline, vars.EmojiAssistant, emojiKey, msg+"\n")
 	}
 	os.Exit(errorCode)
 }
@@ -191,18 +199,8 @@ func getShell() string {
 func CreateAlias(envID, path string) {
 	var shellConfigPath string = filesystem.GetUserHomeDir() + "/." + getShell() + "rc"
 	var cmds []string
-	if envID == vars.NeuraCLINameRepo || envID == vars.NeuraKubeNameRepo || envID == "go" {
-		os := runtime.F.GetOS(runtime.F{})
-		archi := runtime.F.GetOSArchitecture(runtime.F{})
-		executable := envID
-		if envID != "go" {
-			executable = envID+"-"+os+"-"+archi
-		}
-		cmds = []string{"\nalias " + envID + "='cd " + path + " && ./" + executable +"'", "export PATH=\"" + path + ":$PATH\""}
-	} else {
-		cmds = []string{"\nalias " + envID + "='" + path + "'", "export PATH=\"" + path + ":$PATH\""}
-	}
-	created := false
+	cmds = []string{"export PATH=$PATH:" + path}
+	var created bool
 	for _, cmd := range cmds {
 		if !filesystem.FileContainsString(shellConfigPath, cmd) {
 			filesystem.AppendStringToFile(shellConfigPath, cmd)
@@ -210,8 +208,8 @@ func CreateAlias(envID, path string) {
 		}
 	}
 	if created {
-		logging.Log([]string{"\n", vars.EmojiProcess, vars.EmojiInfo}, "Created terminal alias "+envID+".", 0)
-		logging.Log([]string{"", vars.EmojiProcess, vars.EmojiInfo}, "You can now start "+envID+" by just typing "+envID+" in your terminal.", 0)
-		logging.Log([]string{"", vars.EmojiProcess, vars.EmojiInfo}, "Please restart your terminal for this change to take effect.\n", 0)
+		emoji.Println("\n", vars.EmojiProcess, vars.EmojiInfo, "Created terminal alias "+envID+".")
+		emoji.Println("", vars.EmojiProcess, vars.EmojiInfo, "You can now start "+envID+" by just typing "+envID+" in your terminal.")
+		emoji.Println("", vars.EmojiProcess, vars.EmojiInfo, "Please restart your terminal for this change to take effect.\n")
 	}
 }

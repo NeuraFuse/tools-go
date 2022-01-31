@@ -11,6 +11,9 @@ type Default struct {
 		API      struct {
 			Address string `json:"address"`
 		} `json:"api"`
+		CI      struct {
+			Mode string `json:"mode"`
+		} `json:"ci"`
 		Containers struct {
 			Registry struct {
 				Address string `json:"address"`

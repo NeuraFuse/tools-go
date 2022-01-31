@@ -3,30 +3,36 @@ package logging
 import (
 	"fmt"
 	"time"
+
 	"github.com/briandowns/spinner"
 	"github.com/cheggaaa/pb/v3"
-	devconfig "../config/dev"
-	"../timing"
-	"../objects/strings"
-	"../env"
-	"./emoji"
-	"./color"
+	devConfig "github.com/neurafuse/tools-go/config/dev"
+	"github.com/neurafuse/tools-go/env"
+	"github.com/neurafuse/tools-go/logging/color"
+	"github.com/neurafuse/tools-go/logging/emoji"
+	"github.com/neurafuse/tools-go/objects/strings"
+	"github.com/neurafuse/tools-go/timing"
 )
 
-var logMsgLast string = ""
+var logMsgLast string
 var LogTimeLast time.Time
+
 func Log(style []string, msg string, level int) {
-	print := false
-	devconfig.F.SetConfig(devconfig.F{})
+	var print bool
+	if env.F.CLI(env.F{}) {
+		devConfig.F.SetConfig(devConfig.F{})
+	} else {
+		level = 0
+	}
 	if msg != logMsgLast {
 		if level == 0 {
 			print = true
 		} else if level == 1 {
-			if devconfig.F.GetConfig(devconfig.F{}).Spec.LogLevel == "info" {
+			if devConfig.F.IsLogLevelActive(devConfig.F{}, "info") || devConfig.F.IsLogLevelActive(devConfig.F{}, "debug") {
 				print = true
 			}
 		} else if level == 2 {
-			if devconfig.F.GetConfig(devconfig.F{}).Spec.LogLevel == "debug" {
+			if devConfig.F.IsLogLevelActive(devConfig.F{}, "debug") {
 				print = true
 			}
 		}
@@ -43,6 +49,7 @@ func LogActive() {
 }
 
 var progressSpinner *spinner.Spinner = spinner.New(spinner.CharSets[11], timing.GetTimeDuration(50, "ms"))
+
 func ProgressSpinner(action string) {
 	progressSpinner.Color("green", "bold")
 	if action == "start" {
@@ -52,32 +59,33 @@ func ProgressSpinner(action string) {
 	}
 }
 
-var psControllerInterrupt bool = false
+var psControllerInterrupt bool
+
 func psController(action string) {
 	secs := 1
 	switch action {
-		case "start":
-			started := false
-			for {
-				if !psControllerInterrupt {
-					if secs == 1 {
-						if !started {
-							progressSpinner.Start()
-							started = true
-						}
+	case "start":
+		var started bool
+		for {
+			if !psControllerInterrupt {
+				if secs == 1 {
+					if !started {
+						progressSpinner.Start()
+						started = true
 					}
-					if secs > 1 {
-						progressSpinner.Suffix = color.Green(" Fusing it together.. ("+strings.ToString(secs)+"s)")
-					}
-					timing.TimeOut(1, "s")
-					secs++
-				} else {
-					break
 				}
+				if secs > 1 {
+					progressSpinner.Suffix = color.Green(" Fusing it together.. (" + strings.ToString(secs) + "s)")
+				}
+				timing.Sleep(1, "s")
+				secs++
+			} else {
+				break
 			}
-		case "stop":
-			psControllerInterrupt = true
-			progressSpinner.Stop()
+		}
+	case "stop":
+		psControllerInterrupt = true
+		progressSpinner.Stop()
 	}
 }
 
@@ -100,5 +108,5 @@ func PartingLine() {
 	} else if env.F.API(env.F{}) {
 		line = "____________________________________________________________"
 	}
-	fmt.Println(line+"\n")
+	fmt.Println(line + "\n")
 }

@@ -2,8 +2,8 @@ package build
 
 type F struct{}
 
-var checkDo bool = false
-var handover bool = false
+var checkDo bool
+var handover bool
 
 func (f F) Setting(method string, setting string, value bool) bool {
 	switch setting {

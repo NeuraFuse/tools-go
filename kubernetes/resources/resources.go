@@ -3,24 +3,25 @@ package resources
 import (
 	"os"
 
-	"../../logging"
-	"../../objects/strings"
-	"../../vars"
-	"../daemonsets"
-	"../daemonsets/templates"
+	infraConfig "github.com/neurafuse/tools-go/config/infrastructure"
+	"github.com/neurafuse/tools-go/kubernetes/daemonsets"
+	"github.com/neurafuse/tools-go/kubernetes/daemonsets/templates"
+	"github.com/neurafuse/tools-go/logging"
+	"github.com/neurafuse/tools-go/objects/strings"
+	"github.com/neurafuse/tools-go/vars"
 )
 
 func Check(context, resourceType string) {
 	logging.Log([]string{"", vars.EmojiKubernetes, vars.EmojiInspect}, "Checking resourceType "+resourceType+" drivers/environment..", 0)
 	if resourceType == "gpu" {
 		drivers := []string{"nvidia-driver-installer"}
-		createdNew := false
+		var createdNew bool
 		for _, driverID := range drivers {
 			if !daemonsets.F.Exists(daemonsets.F{}, driverID) {
 				createdNew = true
 				logging.Log([]string{"", vars.EmojiInspect, vars.EmojiWarning}, "The driver (daemonset) "+driverID+" does not exist yet.", 0)
 				logging.Log([]string{"", vars.EmojiKubernetes, vars.EmojiProcess}, "Starting creation..", 0)
-				ds := templates.GetConfig("nvidia", vars.InfraProviderActive, "nvidia-driver-installer", "cos")
+				ds := templates.GetConfig("nvidia", infraConfig.F.GetProviderIDActive(infraConfig.F{}), "nvidia-driver-installer", "cos")
 				daemonsets.F.Create(daemonsets.F{}, ds)
 			}
 		}

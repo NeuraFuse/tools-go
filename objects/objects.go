@@ -4,8 +4,8 @@ import (
 	"reflect"
 	"strings"
 
-	"../errors"
-	"../runtime"
+	"github.com/neurafuse/tools-go/errors"
+	"github.com/neurafuse/tools-go/runtime"
 )
 
 /*func GetInterfaceFromReflectValue(i type, any interface{}) interface{} {

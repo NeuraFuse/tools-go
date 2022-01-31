@@ -6,79 +6,17 @@ import (
 	"net/http"
 	runtimeGo "runtime"
 
-	"../../errors"
-	"../../filesystem"
-	"../../filesystem/compression"
-	"../../io"
-	"../../logging"
-	"../../objects/strings"
-	"../../runtime"
-	"../../terminal"
-	"../../timing"
-	"../../vars"
+	"github.com/neurafuse/tools-go/errors"
+	"github.com/neurafuse/tools-go/logging"
+	"github.com/neurafuse/tools-go/objects/strings"
+	"github.com/neurafuse/tools-go/runtime"
+	"github.com/neurafuse/tools-go/timing"
+	"github.com/neurafuse/tools-go/vars"
 )
 
 type F struct{}
 
-const urlBase = "https://dl.google.com/go/"
 const urlVersionsJSON = "https://golang.org/dl/?mode=json"
-const goDirLocal = "/usr/local/go"
-
-func (f F) Check() bool {
-	var updated bool
-	var versionInstalled string
-	var err error
-	var versionNewest string
-	var urlNewest string
-	versionInstalled, _, err = f.GetVersion(true)
-	if !errors.Check(err, runtime.F.GetCallerInfo(runtime.F{}, false), "Unable to get available versions!", false, false, false) {
-		versionNewest, urlNewest, err = f.GetVersion(false)
-		if versionInstalled != versionNewest {
-			updated = f.update(versionInstalled, versionNewest, urlNewest)
-		} else {
-			logging.Log([]string{"", vars.EmojiDev, vars.EmojiSuccess}, "Golang is up to date ("+versionInstalled+").", 0)
-		}
-	} else {
-		logging.Log([]string{"", vars.EmojiDev, vars.EmojiWarning}, "Unable to check for new golang version.", 0)
-	}
-	return updated
-}
-
-func (f F) update(versionInstalled, versionNewest, urlNewest string) bool {
-	updated := false
-	extractedPath := f.cleanup()
-	sel := terminal.GetUserSelection("Do you want to update golang (local "+versionInstalled+") to newest version ("+versionNewest+")?", []string{}, false, true)
-	if sel == "Yes" {
-		logging.Log([]string{"\n", "", vars.EmojiProcess}, "Updating golang..", 0)
-		hostOS := runtime.F.GetOS(runtime.F{})
-		if hostOS == "darwin" {
-			downloadPath := filesystem.GetWorkingDir() + versionNewest
-			io.F.DownloadFile(io.F{}, downloadPath, urlNewest)
-			compression.ExtractTarGz(downloadPath)
-			logging.Log([]string{"", vars.EmojiDir, vars.EmojiProcess}, "Deleting old installation..", 0)
-			logging.Log([]string{"", vars.EmojiDir, vars.EmojiCrypto}, "Asking for sudo permission..", 0)
-			filesystem.Delete(goDirLocal, true)
-			logging.Log([]string{"", vars.EmojiDir, vars.EmojiProcess}, "Moving new setup files..", 0)
-			filesystem.Move(extractedPath, goDirLocal, true)
-			filesystem.GiveProgramPermissions(goDirLocal, runtime.F.GetOSUsername(runtime.F{}))
-			terminal.CreateAlias("go", goDirLocal+"/bin")
-			f.cleanup()
-			updated = true
-		} else {
-			logging.Log([]string{"", vars.EmojiProcess, vars.EmojiWarning}, "Your host OS ("+hostOS+") is not supported yet.", 0)
-		}
-	}
-	return updated
-}
-
-func (f F) cleanup() string {
-	extractedPath := filesystem.GetWorkingDir() + "go/"
-	if filesystem.Exists(extractedPath) {
-		logging.Log([]string{"", vars.EmojiProcess, ""}, "Cleaning up remaining artefacts from previous golang update..", 0)
-		filesystem.Delete(extractedPath, false)
-	}
-	return extractedPath
-}
 
 type GoVersion struct {
 	Version string       `json:"version"`
@@ -96,20 +34,42 @@ type GoDownload struct {
 	Kind     string `json:"kind"`
 }
 
-func (f F) GetVersion(local bool) (string, string, error) {
+func (f F) Check() bool {
+	var updated bool
+	var versionInstalled string
+	var err error
+	var versionNewest string
+	versionInstalled, err = f.GetVersion(true)
+	if !errors.Check(err, runtime.F.GetCallerInfo(runtime.F{}, false), "Unable to get available versions!", false, false, false) {
+		versionNewest, err = f.GetVersion(false)
+		var logMsg string
+		var logEmoji string
+		if versionInstalled == versionNewest {
+			logMsg = "Golang is up to date (" + versionInstalled + ")."
+			logEmoji = vars.EmojiSuccess
+		} else {
+			logMsg = "Golang is not up to date (" + versionInstalled + " --> " + versionNewest + ")."
+			logEmoji = vars.EmojiWarning
+		}
+		logging.Log([]string{"", vars.EmojiDev, logEmoji}, logMsg, 0)
+	} else {
+		logging.Log([]string{"", vars.EmojiDev, vars.EmojiWarning}, "Unable to check for new golang versions.", 0)
+	}
+	return updated
+}
+
+func (f F) GetVersion(local bool) (string, error) {
 	var err error
 	var availableVersions []GoVersion
 	if local {
-		return "go" + strings.Trim(runtimeGo.Version(), "go"), "", err
+		return "go" + strings.Trim(runtimeGo.Version(), "go"), err
 	} else {
 		availableVersions, err = f.getAvailableVersions()
 		var newestVersion string
-		var url string
 		if !errors.Check(err, runtime.F.GetCallerInfo(runtime.F{}, false), "Unable to get available versions!", false, false, false) {
 			newestVersion = availableVersions[0].Version
-			url = urlBase + availableVersions[0].Files[1].Filename
 		}
-		return newestVersion, url, err
+		return newestVersion, err
 	}
 }
 

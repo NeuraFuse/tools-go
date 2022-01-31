@@ -1,16 +1,15 @@
 package cli
 
 import (
-	"../../env"
-	"../../filesystem"
-	"../../logging"
-	"../../objects"
-	"../../readers/yaml"
-	"../../runtime"
-	"../../terminal"
-	"../../users"
-	"../../vars"
-	"../../objects/strings"
+	"github.com/neurafuse/tools-go/env"
+	"github.com/neurafuse/tools-go/filesystem"
+	"github.com/neurafuse/tools-go/logging/emoji"
+	"github.com/neurafuse/tools-go/objects"
+	"github.com/neurafuse/tools-go/objects/strings"
+	"github.com/neurafuse/tools-go/readers/yaml"
+	"github.com/neurafuse/tools-go/runtime"
+	"github.com/neurafuse/tools-go/terminal"
+	"github.com/neurafuse/tools-go/vars"
 )
 
 type F struct{}
@@ -22,7 +21,7 @@ var template *Default
 var fileName string = context + format
 var filePath string
 
-var cliChecked bool = false
+var cliChecked bool
 
 func (f F) SetConfig() (*Default, string) {
 	f.exists()
@@ -41,7 +40,7 @@ func (f F) exists() {
 
 func (f F) setTemplate() {
 	template = &Default{}
-	template.APIVersion = vars.NeuraKubeVersion
+	template.APIVersion = vars.NeuraCLIAPIVersion
 	template.Kind = strings.Title(context)
 }
 
@@ -50,58 +49,38 @@ func (f F) GetConfig() *Default {
 }
 
 func (f F) GetFilePath() string {
-	if filePath == "" {
-		return "users/" + fileName
-	} else {
-		return filePath
+	var filePath string
+	filePath = "users/" + fileName
+	if env.F.CLI(env.F{}) {
+		filePath = runtime.F.GetOSInstallDir(runtime.F{}) + env.F.GetActive(env.F{}, false) + "/" + filePath
 	}
-}
-
-func (f F) SetFilePath(basePath string) {
-	filePath = basePath + "/" + fileName
+	return filePath
 }
 
 func (f F) Configure() {
-	selection := terminal.GetUserSelection("What would you like to configure?", []string{"Default user", "Default project", "Updates"}, false, false)
-	if selection == "Default user" {
-		f.templateDefaultUser()
-	} else if selection == "Default project" {
-		f.templateDefaultProject()
-	} else if selection == "Updates" {
+	var opts []string = []string{"Automatic updates"}
+	var selection string = terminal.GetUserSelection("What would you like to configure?", opts, false, false)
+	if selection == opts[0] {
 		f.SetUpdates()
 	}
 }
 
-func (f F) SetDefaultProject(idActive string) bool {
+func (f F) SetDefault(resourceType string, idActive string) bool {
 	var set bool
-	selectionDefaultProject := terminal.GetUserSelection("Do you want to set "+idActive+" as your default project?", []string{}, false, true)
+	var selectionDefaultProject string = terminal.GetUserSelection("Do you want to set "+idActive+" as your default "+resourceType+"?", []string{}, false, true)
 	if selectionDefaultProject == "Yes" {
-		f.setValue("Spec.Projects.DefaultID", idActive)
+		f.setValue("Spec."+strings.Title(resourceType)+"s.DefaultID", idActive)
 		set = true
 	}
 	return set
 }
 
 func (f F) HasUserNameDefault() bool {
-	exists := true
+	var exists bool = true
 	if template.Spec.Users.DefaultID == "" {
 		exists = false
 	}
 	return exists
-}
-
-func (f F) templateDefaultUser() {
-	if f.HasUserNameDefault() {
-		logging.Log([]string{"", vars.EmojiUser, vars.EmojiWarning}, "You are about to overwrite your current default user: "+f.getValue("Users.Default"), 0)
-	}
-	f.setValue("Spec.Users.Default", terminal.GetUserSelection("Which user should be the default?", users.GetAllIDs(), false, false))
-}
-
-func (f F) templateDefaultProject() {
-	if f.ValidConfigDefaultProject() {
-		logging.Log([]string{"", vars.EmojiProject, vars.EmojiWarning}, "You are about to overwrite your current default project: "+f.getValue("Spec.Projects.DefaultID"), 0)
-	}
-	f.setValue("Spec.Projects.DefaultID", terminal.GetUserSelection("Which project should be the default?", f.GetAllProjectIDs(), false, false))
 }
 
 func (f F) GetAllProjectIDs() []string {
@@ -119,14 +98,15 @@ func (f F) ValidConfigDefaultProject() bool {
 
 func (f F) SetUpdates() {
 	var envActive string = env.F.GetActive(env.F{}, true)
-	logging.Log([]string{"", vars.EmojiAssistant, vars.EmojiInfo}, "It is highly recommended to turn on auto. updates because "+envActive+" is still in an alpha development status.", 0)
-	sel := terminal.GetUserSelection("Should "+envActive+" automatically update itself?", []string{}, false, true)
+	emoji.Println("", vars.EmojiAssistant, vars.EmojiWarning, envActive+" is still in an alpha development status.")
+	emoji.Println("", vars.EmojiAssistant, vars.EmojiInfo, "It is highly recommended to automatically install updates.")
+	var sel string = terminal.GetUserSelection("Should "+envActive+" automatically update itself?", []string{}, false, true)
 	if sel == "Yes" {
 		f.setValue("Spec.Updates.Auto.Status", "active")
-		logging.Log([]string{"", vars.EmojiSettings, vars.EmojiSuccess}, "Checking and applying new updates automatically.\n", 0)
+		emoji.Println("", vars.EmojiSettings, vars.EmojiSuccess, "Checking for and applying new updates automatically.\n")
 	} else {
 		f.setValue("Spec.Updates.Auto.Status", "disabled")
-		logging.Log([]string{"", vars.EmojiSettings, vars.EmojiSuccess}, "Auto update is now turned off.\n", 0)
+		emoji.Println("", vars.EmojiSettings, vars.EmojiSuccess, "Auto update is now turned off.\n")
 	}
 }
 

@@ -6,31 +6,33 @@ var OrganizationWebsite string = OrganizationNameRepo + ".com"
 var OrganizationCountryShort string = "DE"
 
 var NeuraCLIName string = "NeuraCLI"
-var NeuraCLINameRepo string = "neuracli"
-var NeuraCLIVersion string = "v0.1a"
-var NeuraCLIWebsite string = NeuraCLINameRepo + ".org"
-var NeuraCLILicenseType string = "Open GPL"
+var NeuraCLINameID string = "neuracli"
+var NeuraCLIVersion string = "v0.1.1"
+var NeuraCLIAPIVersion string = "apps/v1"
+var NeuraCLIWebsite string = NeuraCLINameID + ".org"
+var NeuraCLILicenseType string = "Apache"
 
 var NeuraKubeName string = "NeuraKube"
-var NeuraKubeNameRepo string = "neurakube"
-var NeuraKubeVersion string = "v0.1a"
-var NeuraKubeWebsite string = NeuraKubeNameRepo + ".org"
-var NeuraKubeLicenseType string = "Open GPL"
+var NeuraKubeNameID string = "neurakube"
+var NeuraKubeVersion string = "v0.1.1"
+var NeuraKubeAPIVersion string = "apps/v1"
+var NeuraKubeWebsite string = NeuraKubeNameID + ".org"
+var NeuraKubeLicenseType string = "Apache"
 
-var FrameworkEnvActive string = ""
+var ToolsGoVersion string = "v0.1.1"
 
-var ProjectsBasePath string = ""
-var ProjectPath string = ""
-var ProjectActiveID string = ""
+var FrameworkEnvActive string
 
-var InfraProviderActive string = ""
+var ProjectsBasePath string
+var ProjectPath string
+var ProjectActiveID string
+
 var InfraProviderSelfHosted string = "selfhosted"
 var InfraProviderGcloud string = "gcloud"
 
 var RESTRoutePreamble string = "/" + NeuraKubeVersion
 
-var ProjectDirActive string = ""
-var ProjectInfrastructureAuthPath string = "/infrastructure/auth"
+var ProjectDirActive string
 
 var EmojiDev string = "space_invader"
 var EmojiUser string = "bust_in_silhouette"

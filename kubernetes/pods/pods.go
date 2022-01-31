@@ -7,22 +7,38 @@ import (
 	"io"
 	"strconv"
 
-	"../../errors"
-	"../../logging"
-	"../../objects/strings"
-	ostrings "../../objects/strings"
-	"../../runtime"
-	"../../timing"
-	"../../vars"
-	"../client"
-	"../deployments"
-	"../namespaces"
+	"github.com/neurafuse/tools-go/errors"
+	"github.com/neurafuse/tools-go/kubernetes/client"
+	"github.com/neurafuse/tools-go/kubernetes/deployments"
+	"github.com/neurafuse/tools-go/kubernetes/namespaces"
+	"github.com/neurafuse/tools-go/logging"
+	"github.com/neurafuse/tools-go/objects/strings"
+	ostrings "github.com/neurafuse/tools-go/objects/strings"
+	"github.com/neurafuse/tools-go/runtime"
+	"github.com/neurafuse/tools-go/timing"
+	"github.com/neurafuse/tools-go/vars"
 	apiv1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	corev1typed "k8s.io/client-go/kubernetes/typed/core/v1"
 )
 
 type F struct{}
+
+func (f F) GetIDFromName(namespace, podName string) string {
+	var podID string
+	var pods []string = f.Get(namespace, false)
+	for _, pod := range pods {
+		if strings.HasPrefix(pod, strings.ToLower(podName)) {
+			podID = pod
+		}
+	}
+	var err error
+	if podID == "" {
+		err = errors.New("Unable to find podID for podName: "+podName+" in namespace "+namespace+"!")
+	}
+	errors.Check(err, runtime.F.GetCallerInfo(runtime.F{}, false), "Unable to get information!", false, true, true)
+	return podID
+}
 
 func (f F) GetList(namespace, contextID string) (*apiv1.PodList, error) {
 	options := metav1.ListOptions{
@@ -35,7 +51,7 @@ func (f F) GetList(namespace, contextID string) (*apiv1.PodList, error) {
 
 func (f F) Get(namespace string, logResult bool) []string {
 	var pods []string
-	deployments := deployments.F.GetList(deployments.F{}, namespace, false)
+	deployments := deployments.F.Get(deployments.F{}, namespace, false)
 	if logResult {
 		logging.Log([]string{"\n", vars.EmojiKubernetes, vars.EmojiInfo}, "Pods:", 0)
 	}
@@ -80,7 +96,7 @@ func (f F) Delete(namespace, contextID string) {
 	}
 }
 
-var logscontextIDLast string = ""
+var logscontextIDLast string
 
 //var logsErrStreamCh chan error
 var logsErrStream error
@@ -90,9 +106,9 @@ func (f F) Logs(namespace, contextID, waitForStatusInLog string, parallel bool, 
 	if !errors.Check(err, runtime.F.GetCallerInfo(runtime.F{}, false), "Unable to get logs for "+contextID+"!", false, false, true) {
 		if contextID != logscontextIDLast {
 			logscontextIDLast = contextID
-			var success bool = false
+			var finished bool
 			//logsErrStreamCh = make(chan error)
-			for ok := true; ok; ok = !success {
+			for ok := true; ok; ok = !finished {
 				if parallel {
 					go f.LogsRoutine(namespace, contextID, waitForStatusInLog)
 				} else {
@@ -101,21 +117,21 @@ func (f F) Logs(namespace, contextID, waitForStatusInLog string, parallel bool, 
 				//errStreamCh := <-logsErrStreamCh
 				if logsErrStream != nil {
 					err = f.WaitForPhase(namespace, contextID, "running", 1)
-					if !errors.Check(err, runtime.F.GetCallerInfo(runtime.F{}, false), "Unable to get logs for "+contextID+"!", false, false, true) {
-						errors.Check(nil, runtime.F.GetCallerInfo(runtime.F{}, false), "Unable to stream pod logs because the deployment "+contextID+" doesn't exist!", true, true, true)
+					if errors.Check(err, runtime.F.GetCallerInfo(runtime.F{}, false), "Unable to stream pod logs because the deployment "+contextID+" doesn't exist!", false, false, true) {
+						finished = true
 					}
 				} else {
-					success = true
+					finished = true
 				}
 			}
 		}
 	}
 }
 
-var InterruptPodLogsLive bool = false
+var InterruptPodLogsLive bool
 
 func (f F) LogsRoutine(namespace, contextID, waitForStatusInLog string) {
-	logsLast := ""
+	var logsLast string
 	if waitForStatusInLog != "" {
 		logging.Log([]string{"\n", vars.EmojiKubernetes, vars.EmojiInspect}, "Waiting for pod log status \""+waitForStatusInLog+"\" to occur in "+contextID+"..", 0)
 	} else {
@@ -141,7 +157,7 @@ func (f F) LogsRoutine(namespace, contextID, waitForStatusInLog string) {
 					}
 				}
 				logsLast = logsCurrent
-				timing.TimeOut(1, "s")
+				timing.Sleep(1, "s")
 			} else {
 				InterruptPodLogsLive = true
 			}
@@ -164,7 +180,7 @@ func (f F) GetLogs(namespace, contextID string) (string, error) {
 	podLogOpts := apiv1.PodLogOptions{}
 	req := f.getClient(namespace).GetLogs(pod.Name, &podLogOpts)
 	podLogs, errStream := req.Stream(contextPack.TODO())
-	logsStr := ""
+	var logsStr string
 	if !errors.Check(errStream, runtime.F.GetCallerInfo(runtime.F{}, false), "Unable to get "+contextID+" pod logs because it was deleted!", false, false, true) {
 		defer podLogs.Close()
 		buf := new(bytes.Buffer)
@@ -227,7 +243,7 @@ func (f F) WaitForPhase(namespace, contextID, phase string, initWaitDuration int
 	if !errors.Check(err, runtime.F.GetCallerInfo(runtime.F{}, false), "Unable to wait for "+contextID+" pod phase!", false, false, true) {
 		if !(phaseCurrent == phase) {
 			i := 0
-			var success bool = false
+			var success bool
 			for ok := true; ok; ok = !success {
 				phaseCurrent, _ = f.GetPhase(namespace, contextID)
 				if phaseCurrent == phase {
@@ -235,7 +251,7 @@ func (f F) WaitForPhase(namespace, contextID, phase string, initWaitDuration int
 					logging.Log([]string{"", vars.EmojiKubernetes, vars.EmojiSuccess}, "Pod "+contextID+" is now in phase "+strings.ToLower(phase)+".", 0)
 				} else {
 					logging.Log([]string{"", vars.EmojiKubernetes, vars.EmojiWaiting}, "Waiting (max. "+ostrings.ToString(initWaitDuration)+" minutes) for "+contextID+" pod phase to be "+strings.ToLower(phase)+"..", 0)
-					timing.TimeOut(1, "s")
+					timing.Sleep(1, "s")
 				}
 				i++
 				if i == initWaitDuration*60 {
@@ -252,14 +268,14 @@ func (f F) GetPhase(namespace, contextID string) (string, error) {
 	var pod apiv1.Pod
 	var phase string
 	var err error
-	var success bool = false
+	var success bool
 	for ok := true; ok; ok = !success {
 		pod, err = f.getPod(namespace, contextID)
 		if !errors.Check(err, runtime.F.GetCallerInfo(runtime.F{}, false), "Waiting for "+contextID+" pods to be created to fetch status..", false, false, true) {
 			phase = string(pod.Status.Phase)
 			success = true
 		} else {
-			timing.TimeOut(1, "s")
+			timing.Sleep(1, "s")
 		}
 	}
 	return phase, err
@@ -270,7 +286,7 @@ func (f F) WaitForCondition(namespace, contextID, conditionType string, waitMins
 	var err error
 	conditions, err = f.GetConditions(namespace, contextID)
 	if !errors.Check(err, runtime.F.GetCallerInfo(runtime.F{}, false), "Failed to get "+contextID+" pod conditions!", false, false, true) {
-		var success bool = false
+		var success bool
 		i := 0
 
 		for ok := true; ok; ok = !success {
@@ -287,7 +303,7 @@ func (f F) WaitForCondition(namespace, contextID, conditionType string, waitMins
 					break
 				} else {
 					logging.Log([]string{"", vars.EmojiKubernetes, vars.EmojiWaiting}, "Waiting (max. "+ostrings.ToString(waitMinsMax)+" minutes) for pod condition to be "+conditionType+"..", 0)
-					timing.TimeOut(1, "s")
+					timing.Sleep(1, "s")
 				}
 			}
 			i++

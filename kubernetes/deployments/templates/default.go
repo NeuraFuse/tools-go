@@ -1,8 +1,8 @@
 package templates
 
 import (
-	"../../../config"
-	"../../../objects/strings"
+	"github.com/neurafuse/tools-go/config"
+	"github.com/neurafuse/tools-go/objects/strings"
 	appsv1 "k8s.io/api/apps/v1"
 	apiv1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -75,7 +75,7 @@ func getVolumes(id string, volumes [][]string) ([]apiv1.VolumeMount, []apiv1.Vol
 	if strings.Contains(id, "inference") { // TODO: Refactor
 		pvName = "pv-app-1"
 		pvcName = "pvc-app-1"
-		volumes = [][]string{{"/app/lightning/pytorch/data", "100Gi"}}
+		volumes = [][]string{{"/app/lightning-py/pytorch/data", "100Gi"}}
 	}
 	var volumeMounts []apiv1.VolumeMount
 	var volumesAPIv1 []apiv1.Volume
@@ -99,10 +99,10 @@ func getVolumes(id string, volumes [][]string) ([]apiv1.VolumeMount, []apiv1.Vol
 
 func getResources(res string) (apiv1.ResourceRequirements, map[string]string) {
 	var resQuantity string = "0"
-	var resName string = ""
+	var resName string
 	const GPUKey string = "nvidia.com/gpu"
 	const TPUKey string = "cloud-tpus.google.com/"
-	resRequested := false
+	var resRequested bool
 	annotations := make(map[string]string)
 	if res == "gpu" {
 		resName = GPUKey
@@ -139,4 +139,6 @@ func nodeSelectorRequirement(serviceCluster string) []apiv1.NodeSelectorRequirem
 	return nodeSelectorRequirement
 }
 
-func int32Ptr(i int32) *int32 { return &i }
+func int32Ptr(i int32) *int32 {
+	return &i
+}

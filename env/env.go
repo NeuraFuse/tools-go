@@ -1,9 +1,9 @@
 package env
 
 import (
-	"../objects/strings"
-	"../vars"
-	"../filesystem"
+	"github.com/neurafuse/tools-go/filesystem"
+	"github.com/neurafuse/tools-go/objects/strings"
+	"github.com/neurafuse/tools-go/vars"
 )
 
 type F struct{}
@@ -25,7 +25,7 @@ func (f F) GetContainerWorkingDir() string {
 }
 
 func (f F) Container() bool {
-	workingDir := filesystem.GetWorkingDir()
+	workingDir := filesystem.GetWorkingDir(false)
 	if workingDir == f.GetContainerWorkingDir() {
 		return true
 	} else {
@@ -45,32 +45,32 @@ func (f F) GetAPIHTTPCertPath() string {
 }
 
 func (f F) CLI() bool {
-	return f.ActiveFramework(f.GetID("neuracli"))
+	return f.IsFrameworkActive(f.GetID("neuracli"))
 }
 
 func (f F) API() bool {
-	return f.ActiveFramework(f.GetID("neurakube"))
+	return f.IsFrameworkActive(f.GetID("neurakube"))
 }
 
 func (f F) Develop() bool {
-	return f.ActiveAction(f.GetID("develop"))
+	return f.IsActionActive(f.GetID("develop"))
 }
 
 func (f F) App() bool {
-	return f.ActiveAction(f.GetID("app"))
+	return f.IsActionActive(f.GetID("app"))
 }
 
 func (f F) Inference() bool {
-	return f.ActiveAction(f.GetID("inference"))
+	return f.IsActionActive(f.GetID("inference"))
 }
 
 func (f F) GetID(name string) string {
-	id := ""
+	var id string
 	switch name {
 	case "neuracli":
-		id = vars.NeuraCLINameRepo
+		id = vars.NeuraCLINameID
 	case "neurakube":
-		id = vars.NeuraKubeNameRepo
+		id = vars.NeuraKubeNameID
 	case "develop":
 		id = "develop"
 	case "app":
@@ -81,7 +81,7 @@ func (f F) GetID(name string) string {
 	return id
 }
 
-func (f F) ActiveFramework(envName string) bool {
+func (f F) IsFrameworkActive(envName string) bool {
 	if envName == vars.FrameworkEnvActive {
 		return true
 	} else {
@@ -89,7 +89,7 @@ func (f F) ActiveFramework(envName string) bool {
 	}
 }
 
-func (f F) ActiveAction(action string) bool {
+func (f F) IsActionActive(action string) bool {
 	if actionActive == action {
 		return true
 	} else {

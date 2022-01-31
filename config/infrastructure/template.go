@@ -8,7 +8,6 @@ type Default struct {
 	Spec       struct {
 		Gcloud struct {
 			Auth struct {
-				ServiceAccountJSONPath string `json:"serviceAccountJSONPath"`
 			} `json:"auth"`
 			ProjectID              string `json:"projectID"`
 			Zone                   string `json:"zone"`
@@ -35,10 +34,8 @@ type Default struct {
 			} `json:"accelerator"`
 		} `json:"gcloud"`
 		Cluster struct {
-			Name           string `json:"name"`
+			ID           string `json:"id"`
 			Auth struct {
-				Password       string `json:"password"`
-				KubeConfigPath string `json:"kubeConfigPath"`
 			} `json:"auth"`
 			SelfDeletion   struct {
 				Active            string `json:"active"`
@@ -46,7 +43,7 @@ type Default struct {
 			} `json:"selfDeletion"`
 			Nodes struct {
 				DiskSizeGb string `json:"diskSizeGb"`
-			} `yaml:nodes`
+			} `json:nodes`
 		} `json:"cluster"`
 		Neurakube struct {
 			VolumeSizeGB string `json:"volumeSizeGB"`
@@ -56,7 +53,7 @@ type Default struct {
 				ConnectStatus string `json:"connectStatus"`
 			} `json:"cache"`
 		} `json:"neurakube"`
-		Remote struct {
+		Develop struct {
 			Environment struct {
 				IDE       string `json:"ide"`
 				Framework string `json:"framework"`
@@ -70,7 +67,7 @@ type Default struct {
 			NodePools struct {
 				Dedicated string `json:"dedicated"`
 			} `json:"nodePools"`
-		} `json:"remote"`
+		} `json:"develop"`
 		App struct {
 			Environment struct {
 				IDE       string `json:"ide"`

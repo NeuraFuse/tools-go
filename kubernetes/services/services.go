@@ -5,15 +5,17 @@ import (
 	"fmt"
 	"strconv"
 
-	"../../errors"
-	"../../logging"
-	"../../objects/strings"
-	"../../runtime"
-	"../../timing"
-	"../../vars"
-	"../client"
-	"../namespaces"
-	"./templates"
+	"github.com/neurafuse/tools-go/errors"
+	"github.com/neurafuse/tools-go/io/ip"
+	"github.com/neurafuse/tools-go/kubernetes/client"
+	"github.com/neurafuse/tools-go/kubernetes/namespaces"
+	"github.com/neurafuse/tools-go/kubernetes/services/templates"
+	"github.com/neurafuse/tools-go/logging"
+	"github.com/neurafuse/tools-go/objects/strings"
+	"github.com/neurafuse/tools-go/random"
+	"github.com/neurafuse/tools-go/runtime"
+	"github.com/neurafuse/tools-go/timing"
+	"github.com/neurafuse/tools-go/vars"
 	apiv1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	corev1typed "k8s.io/client-go/kubernetes/typed/core/v1"
@@ -25,8 +27,8 @@ func (f F) getClient(namespace string) corev1typed.ServiceInterface {
 	if namespace == "" {
 		namespace = namespaces.Default
 	}
-	test := client.F.GetAuth(client.F{}).CoreV1().Services(namespace)
-	return test
+	var client corev1typed.ServiceInterface = client.F.GetAuth(client.F{}).CoreV1().Services(namespace)
+	return client
 }
 
 func (f F) getServiceList(namespace string) (*apiv1.ServiceList, error) {
@@ -34,13 +36,13 @@ func (f F) getServiceList(namespace string) (*apiv1.ServiceList, error) {
 	return list, err
 }
 
-func (f F) Get(namespace, contextID string) *apiv1.Service {
+func (f F) GetService(namespace, contextID string) *apiv1.Service {
 	service, err := f.getClient(namespace).Get(contextPack.TODO(), contextID, metav1.GetOptions{})
 	errors.Check(err, runtime.F.GetCallerInfo(runtime.F{}, false), "Unable to get service "+contextID+" in namespace "+namespace+"!", false, true, true)
 	return service
 }
 
-func (f F) GetList(namespace string, logResult bool) []string {
+func (f F) Get(namespace string, logResult bool) []string {
 	list, err := f.getServiceList(namespace)
 	var services []string
 	if logResult {
@@ -80,9 +82,9 @@ func (f F) GetList(namespace string, logResult bool) []string {
 
 func (f F) GetLoadBalancerIP(namespace, contextID string) string {
 	var lbIP string
-	var success bool = false
+	var success bool
 	logging.ProgressSpinner("start")
-	var loggedWaiting bool = false
+	var loggedWaiting bool
 	list, err := f.getServiceList(namespace)
 	if !errors.Check(err, runtime.F.GetCallerInfo(runtime.F{}, false), "Unable to fetch services in namespace "+namespaces.Default+":", false, true, true) {
 		if len(list.Items) != 0 {
@@ -94,7 +96,7 @@ func (f F) GetLoadBalancerIP(namespace, contextID string) string {
 							logging.Log([]string{"", vars.EmojiKubernetes, vars.EmojiWaiting}, "Waiting for creation of "+contextID+" service endpoints..", 0)
 							loggedWaiting = true
 						}
-						timing.TimeOut(1, "s")
+						timing.Sleep(1, "s")
 					} else {
 						logging.Log([]string{"", vars.EmojiKubernetes, vars.EmojiSuccess}, "Resolved endpoints for service "+contextID+".", 2)
 						lbIP = s.Status.LoadBalancer.Ingress[0].IP
@@ -105,26 +107,36 @@ func (f F) GetLoadBalancerIP(namespace, contextID string) string {
 			}
 		}
 		if !success {
-			errors.Check(nil, runtime.F.GetCallerInfo(runtime.F{}, false), "Unable to find service "+contextID+"!", true, false, true)
+			errors.Check(nil, runtime.F.GetCallerInfo(runtime.F{}, false), "Unable to find service "+contextID+" in namespace "+namespace+"!", true, false, true)
 		}
 	}
 	return lbIP
 }
 
 func (f F) GetClusterIP(namespace, contextID string) string {
-	service := f.Get(namespace, contextID)
+	service := f.GetService(namespace, contextID)
 	return service.Spec.ClusterIP
 }
 
 func (f F) Create(namespace, contextID, clusterIP string, ports [][]string) {
 	if !f.Exists(namespace, contextID) {
-		service := templates.GetConfig(contextID, clusterIP, ports)
-		_, err := f.getClient(namespace).Create(contextPack.TODO(), service, metav1.CreateOptions{})
-		if !errors.Check(err, runtime.F.GetCallerInfo(runtime.F{}, false), "Unable to create service "+contextID+"!", false, false, true) {
-			logging.Log([]string{"", vars.EmojiKubernetes, vars.EmojiSuccess}, "Created service "+contextID+".", 0)
+		var success bool
+		for ok := true; ok; ok = !success {
+			service := templates.GetConfig(contextID, clusterIP, ports)
+			_, err := f.getClient(namespace).Create(contextPack.TODO(), service, metav1.CreateOptions{})
+			if !errors.Check(err, runtime.F.GetCallerInfo(runtime.F{}, false), "Unable to create service "+contextID+"!", false, false, true) {
+				success = true
+				logging.Log([]string{"", vars.EmojiKubernetes, vars.EmojiSuccess}, "Created service "+contextID+".", 0)
+			} else {
+				if strings.Contains(err.Error(), "error:provided IP is already allocated") {
+					network, _ := ip.SplitBlocks(clusterIP)
+					clusterIP = network + strings.ToString(random.GetInt(1, 254))
+					logging.Log([]string{"", vars.EmojiKubernetes, vars.EmojiWarning}, "Fail recovery: Updated clusterIP to "+clusterIP+".", 0)
+				}
+			}
 		}
 	} else {
-		logging.Log([]string{"", vars.EmojiKubernetes, vars.EmojiWarning}, "Service "+contextID+" already exists.", 0)
+		logging.Log([]string{"", vars.EmojiKubernetes, vars.EmojiSuccess}, "Service "+contextID+" already exists.", 0)
 	}
 }
 
@@ -136,7 +148,7 @@ func (f F) Delete(namespace, contextID string) {
 		}); err != nil {
 			errors.Check(err, runtime.F.GetCallerInfo(runtime.F{}, false), "Unable to delete service!", true, true, true)
 		} else {
-			var success bool = false
+			var success bool
 			logging.ProgressSpinner("start")
 			for ok := true; ok; ok = !success {
 				if f.Exists(namespace, contextID) {
@@ -146,7 +158,7 @@ func (f F) Delete(namespace, contextID string) {
 					logging.ProgressSpinner("stop")
 					logging.Log([]string{"", vars.EmojiKubernetes, vars.EmojiSuccess}, "Deleted service "+contextID+".", 1)
 				}
-				timing.TimeOut(1, "s")
+				timing.Sleep(1, "s")
 			}
 		}
 	} else {
@@ -155,5 +167,5 @@ func (f F) Delete(namespace, contextID string) {
 }
 
 func (f F) Exists(namespace, contextID string) bool {
-	return strings.ArrayContains(f.GetList(namespace, false), contextID)
+	return strings.ArrayContains(f.Get(namespace, false), contextID)
 }

@@ -1,0 +1,10 @@
+FROM pytorch/pytorch:1.6.0-cuda10.1-cudnn7-runtime
+
+RUN pip install future
+RUN pip install debugpy
+RUN pip install tensorflow-io
+RUN pip install tensorboard
+RUN pip install flask
+
+RUN pip install torch_optimizer
+RUN pip install psutil

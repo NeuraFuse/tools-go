@@ -2,15 +2,15 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Accelerator | Develop | NeuraFuse",
+            "name": "Develop | NeuraCLI",
             "type": "python",
             "request": "attach",
             "port": 2000,
             "host": "localhost",
             "pathMappings": [
                 {
-                  "localRoot": "${workspaceFolder}/lightning/tf",
-                  "remoteRoot": "/app/lightning/tf"
+                  "localRoot": "${workspaceFolder}",
+                  "remoteRoot": "/app/"
                 }
             ]
         },
@@ -24,7 +24,7 @@
             "console": "integratedTerminal"
         },
         {
-            "name": "neurakube | NeuraFuse",
+            "name": "NeuraKube | NeuraFuse",
             "type": "go",
             "request": "launch",
             "mode": "debug",

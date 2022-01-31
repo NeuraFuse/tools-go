@@ -1,12 +1,12 @@
 version: v1beta9
 images:
   remote:
-    image: gcr.io/djw-ai/services/neurafuse/develop/remote/pytorch/tpu:latest
+    image: gcr.io/djw-ai/services/neurafuse/develop/pytorch/tpu:latest
 dev:
   sync:
   - imageName: remote
     namespace: neurafuse-djw
-    localSubPath: ../lightning
-    containerPath: /app/lightning
+    localSubPath: ../lightning-py
+    containerPath: /app/lightning-py
     excludePaths:
-      - ../lightning/pytorch/data
+      - ../lightning-py/pytorch/data

@@ -6,10 +6,10 @@ import (
 	"io"
 	"os/exec"
 
-	"../errors"
-	"../filesystem"
-	"../objects/strings"
-	"../runtime"
+	"github.com/neurafuse/tools-go/errors"
+	"github.com/neurafuse/tools-go/filesystem"
+	"github.com/neurafuse/tools-go/objects/strings"
+	"github.com/neurafuse/tools-go/runtime"
 )
 
 func Run(program string, args []string) {
@@ -27,21 +27,21 @@ func WithLiveLogs(program string, args []string, printLogs bool) error {
 	var err error
 	var errMsg string
 	var out io.Reader
-    {
+	{
 		stdout, err := cmd.StdoutPipe()
-		errMsg = "Unable to get StdoutPipe pipe: "+program+" "+argsStr
+		errMsg = "Unable to get StdoutPipe pipe: " + program + " " + argsStr
 		if errors.Check(err, runtime.F.GetCallerInfo(runtime.F{}, false), errMsg, false, false, true) {
 			err = errors.New(errMsg)
 		}
 		stderr, err := cmd.StderrPipe()
-		errMsg = "Unable to get StderrPipe pipe: "+program+" "+argsStr
-        if errors.Check(err, runtime.F.GetCallerInfo(runtime.F{}, false), errMsg, false, false, true) {
+		errMsg = "Unable to get StderrPipe pipe: " + program + " " + argsStr
+		if errors.Check(err, runtime.F.GetCallerInfo(runtime.F{}, false), errMsg, false, false, true) {
 			err = errors.New(errMsg)
 		}
-        out = io.MultiReader(stdout, stderr)
-    }
+		out = io.MultiReader(stdout, stderr)
+	}
 	err = cmd.Start()
-	errMsg = "Unable to execute command: "+program+" "+argsStr
+	errMsg = "Unable to execute command: " + program + " " + argsStr
 	if errors.Check(err, runtime.F.GetCallerInfo(runtime.F{}, false), errMsg, false, false, true) {
 		err = errors.New(errMsg)
 	}
@@ -52,7 +52,7 @@ func WithLiveLogs(program string, args []string, printLogs bool) error {
 		}
 	}
 	err = cmd.Wait()
-	errMsg = "The command has quit with errors: "+program+" "+argsStr
+	errMsg = "The command has quit with errors: " + program + " " + argsStr
 	if errors.Check(err, runtime.F.GetCallerInfo(runtime.F{}, false), errMsg, false, false, true) {
 		err = errors.New(errMsg)
 	}

@@ -7,12 +7,12 @@ import (
 	"unicode"
 	"unsafe"
 
-	"../../errors"
-	"../../runtime"
+	"github.com/neurafuse/tools-go/errors"
+	"github.com/neurafuse/tools-go/runtime"
 )
 
 type Builder struct {
-    // contains filtered or unexported fields
+	// contains filtered or unexported fields
 }
 
 func ToBytes(input string) []byte {
@@ -28,11 +28,11 @@ func BoolToString(input bool) string {
 }
 
 func LinesCount(s string) int {
-    n := strings.Count(s, "\n")
-    if len(s) > 0 && !strings.HasSuffix(s, "\n") {
-        n++
-    }
-    return n
+	n := strings.Count(s, "\n")
+	if len(s) > 0 && !strings.HasSuffix(s, "\n") {
+		n++
+	}
+	return n
 }
 
 func SentenceToWords(s string) []string {
@@ -69,7 +69,6 @@ func FieldsFunc(input string, f func(rune) bool) []string {
 	return strings.FieldsFunc(input, f)
 }
 
-
 func ToUpper(input string) string {
 	return strings.ToUpper(input)
 }
@@ -96,7 +95,7 @@ func ToSentences(input string) []string {
 	var output []string
 	var sentence string
 	for _, l := range input {
-		sentence = sentence+string(l)
+		sentence = sentence + string(l)
 		if l == '\n' {
 			output = append(output, sentence)
 			sentence = ""
@@ -107,12 +106,12 @@ func ToSentences(input string) []string {
 
 func ArrayRemoveEmptyStrings(input []string) []string {
 	var output []string
-    for _, entry := range input {
-        if entry != "" {
-            output = append(output, entry)
-        }
-    }
-    return output
+	for _, entry := range input {
+		if entry != "" {
+			output = append(output, entry)
+		}
+	}
+	return output
 }
 
 func ArrayRemoveString(input []string, searchStr string) []string {
@@ -127,15 +126,15 @@ func ArrayRemoveString(input []string, searchStr string) []string {
 
 func ArrayContains(input []string, searchStr string) bool {
 	for _, entry := range input {
-        if entry == searchStr {
-            return true
-        }
-    }
-    return false
+		if entry == searchStr {
+			return true
+		}
+	}
+	return false
 }
 
 func ArrayRemoveIndex(ar []string, i int) []string {
-    return append(ar[:i], ar[i+1:]...)
+	return append(ar[:i], ar[i+1:]...)
 }
 
 func Split(input, sep string) []string {
@@ -170,9 +169,9 @@ func ArrayToString(ar []string, sep string) string {
 }
 
 func BytesToString(b []byte) string {
-    bh := (*reflect.SliceHeader)(unsafe.Pointer(&b))
-    sh := reflect.StringHeader{bh.Data, bh.Len}
-    return *(*string)(unsafe.Pointer(&sh))
+	bh := (*reflect.SliceHeader)(unsafe.Pointer(&b))
+	sh := reflect.StringHeader{bh.Data, bh.Len}
+	return *(*string)(unsafe.Pointer(&sh))
 }
 
 func Contains(input, searchstr string) bool {
@@ -192,7 +191,7 @@ func Int64ToString(input int64) string {
 }
 
 func FloatToString(input_num float64) string {
-    return strconv.FormatFloat(input_num, 'f', 6, 64)
+	return strconv.FormatFloat(input_num, 'f', 6, 64)
 }
 
 func ToInt(input string) int {

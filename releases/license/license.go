@@ -1,14 +1,15 @@
 package license
 
 import (
-	"../../filesystem"
-	"../../env"
-	"../../runtime"
-	"../../logging"
-	"../../vars"
+	"github.com/neurafuse/tools-go/env"
+	"github.com/neurafuse/tools-go/filesystem"
+	"github.com/neurafuse/tools-go/logging"
+	"github.com/neurafuse/tools-go/runtime"
+	"github.com/neurafuse/tools-go/vars"
 )
 
 type F struct{}
+
 var context string = env.F.GetContext(env.F{}, runtime.F.GetCallerInfo(runtime.F{}, true), false)
 
 func (f F) CreateFile() {

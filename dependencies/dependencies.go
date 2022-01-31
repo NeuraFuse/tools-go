@@ -1,9 +1,9 @@
 package dependencies
 
 import (
-	"../logging"
-	"../updater/golang"
-	"../vars"
+	"github.com/neurafuse/tools-go/logging"
+	"github.com/neurafuse/tools-go/updater/golang"
+	"github.com/neurafuse/tools-go/vars"
 )
 
 type F struct{}

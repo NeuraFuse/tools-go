@@ -10,10 +10,6 @@ type Default struct {
 			DefaultID string `json:"defaultID"`
 			ActiveID string `json:"activeID"`
 		} `json:"users"`
-		Projects struct {
-			DefaultID string `json:"defaultID"`
-			ActiveID string `json:"activeID"`
-		} `json:"projects"`
 		Updates struct {
 			Auto struct {
 				Status string `json:"status"`

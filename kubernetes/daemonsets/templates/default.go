@@ -1,16 +1,17 @@
 package templates
 
 import (
-	"../../../errors"
-	"../../../filesystem"
-	"../../../io"
-	"../../../runtime"
+	"github.com/neurafuse/tools-go/errors"
+	"github.com/neurafuse/tools-go/filesystem"
+	"github.com/neurafuse/tools-go/io"
+	"github.com/neurafuse/tools-go/runtime"
+	"github.com/neurafuse/tools-go/vars"
 	appsv1 "k8s.io/api/apps/v1"
 	"k8s.io/client-go/kubernetes/scheme"
 )
 
 func GetConfig(platform, provider, id, nodeImage string) *appsv1.DaemonSet {
-	basePath := "../tools-go/kubernetes/daemonsets/templates/"
+	basePath := "../tools-go@" + vars.ToolsGoVersion + "/kubernetes/daemonsets/templates/"
 	templatePath := basePath + platform + "/" + provider + "/" + id + "/" + nodeImage
 	templateFile := "/template.yaml"
 	templateFilePath := templatePath + templateFile

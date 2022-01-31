@@ -1,3 +1,6 @@
 package flask
 
-var ContainerPorts []string = []string{"3000", "TCP"}
+func GetContainerPorts() []string {
+	var containerPorts []string = []string{"3000", "TCP"}
+	return containerPorts
+}

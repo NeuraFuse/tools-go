@@ -1,4 +1,4 @@
-package crypto
+package random
 
 import (
 	"math/rand"
@@ -9,7 +9,7 @@ const charset = "abcdefghijklmnopqrstuvwxyz" + "ABCDEFGHIJKLMNOPQRSTUVWXYZ012345
 
 var seededRand *rand.Rand = rand.New(rand.NewSource(time.Now().UnixNano()))
 
-func RandomString(length int) string {
+func GetString(length int) string {
 	b := make([]byte, length)
 	for i := range b {
 		b[i] = charset[seededRand.Intn(len(charset))]
@@ -17,6 +17,6 @@ func RandomString(length int) string {
 	return string(b)
 }
 
-func RandomInt(min, max int) int {
+func GetInt(min, max int) int {
 	return rand.Intn(max - min) + min
 }

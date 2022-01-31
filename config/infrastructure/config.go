@@ -1,16 +1,20 @@
 package infrastructure
 
 import (
-	"../../env"
-	"../../filesystem"
-	"../../logging"
-	"../../objects"
-	"../../objects/strings"
-	"../../readers/yaml"
-	"../../runtime"
-	"../../terminal"
-	"../../users"
-	"../../vars"
+	"github.com/neurafuse/tools-go/env"
+	"github.com/neurafuse/tools-go/errors"
+	"github.com/neurafuse/tools-go/exec"
+	"github.com/neurafuse/tools-go/filesystem"
+	infraID "github.com/neurafuse/tools-go/infrastructures/id"
+	kubeID "github.com/neurafuse/tools-go/kubernetes/client/id"
+	"github.com/neurafuse/tools-go/logging"
+	"github.com/neurafuse/tools-go/objects"
+	"github.com/neurafuse/tools-go/objects/strings"
+	"github.com/neurafuse/tools-go/readers/yaml"
+	"github.com/neurafuse/tools-go/runtime"
+	"github.com/neurafuse/tools-go/terminal"
+	usersID "github.com/neurafuse/tools-go/users/id"
+	"github.com/neurafuse/tools-go/vars"
 )
 
 type F struct{}
@@ -24,12 +28,12 @@ var fileName string = context + format
 
 func (f F) SetConfig() (*Default, string) {
 	f.exists()
-	return f.GetConfig(), f.GetFilePath()
+	return f.GetConfig(), f.GetPath(true)
 }
 
 func (f F) exists() {
 	f.setTemplate()
-	filePath = f.GetFilePath()
+	filePath = f.GetPath(true)
 	if filesystem.Exists(filePath) {
 		yaml.FileToStruct(filePath, &config)
 	}
@@ -37,39 +41,84 @@ func (f F) exists() {
 
 func (f F) setTemplate() {
 	config = &Default{}
-	config.APIVersion = vars.NeuraKubeVersion
+	config.APIVersion = vars.NeuraKubeAPIVersion
 	config.Kind = strings.Title(context)
 }
 
-func (f F) GetFilePath() string {
-	return users.BasePath + "/" + users.GetIDActive() + "/" + context + "/" + fileName
+func (f F) GetBasePath() string {
+	var path string
+	var preemble string
+	if env.F.CLI(env.F{}) {
+		preemble = runtime.F.GetOSInstallDir(runtime.F{}) + vars.NeuraCLINameID + "/" + usersID.BasePath // TODO: Ref.
+	} else if env.F.API(env.F{}) {
+		if env.F.Container(env.F{}) {
+			preemble = f.GetContainerUserPath()
+		} else {
+			preemble = filesystem.GetWorkingDir(false) + usersID.BasePath
+		}
+	}
+	path = preemble + usersID.F.GetActive(usersID.F{}) + "/" + context + "/"
+	return path
+}
+
+func (f F) GetPath(withFileName bool) string {
+	var path string
+	path = f.GetBasePath() + infraID.F.GetActive(infraID.F{}) + "/"
+	if withFileName {
+		path = path + fileName
+	}
+	return path
+}
+
+func (f F) GetAllIDs() []string {
+	return filesystem.Explorer("files", f.GetBasePath(), []string{}, []string{"hidden", ".yaml", "infrastructure"})
 }
 
 func (f F) GetConfig() *Default {
 	return config
 }
 
+func (f F) GetContainerUserPath() string {
+	return env.F.GetContainerWorkingDir(env.F{}) + usersID.BasePath
+}
+
 func (f F) SetProject() {
-	sel := terminal.GetUserSelection("What is the gcloud projectID?", []string{"Example: my-ai-project"}, true, false)
+	var sel string = terminal.GetUserSelection("What is the "+vars.InfraProviderGcloud+" projectID?", []string{"Example: my-ai-project"}, true, false)
 	if sel != "" {
 		f.setValue("Spec.Gcloud.ProjectID", sel)
 	}
-	sel = terminal.GetUserSelection("What is the gcloud zone?", []string{"Default: us-central1-a"}, true, false)
+	sel = terminal.GetUserSelection("What is the "+vars.InfraProviderGcloud+" zone?", []string{"Default: us-central1-a"}, true, false)
 	if sel != "" {
 		f.setValue("Spec.Gcloud.Zone", sel)
 	}
 }
 
-func (f F) SetAuth() {
-	sel := terminal.UserSelectionFiles("Which gcloud service account json should be the default for your projects?", "files", f.getProjectAuthPath(), []string{"json"}, []string{"hidden"}, false, true)
-	if sel != "" {
-		f.setValue("Spec.Gcloud.Auth.ServiceAccountJSONPath", sel)
+var providerIDActive string // TODO: Ref.
+
+func (f F) ProviderIDIsActive(id string) bool {
+	var status bool
+	if id == f.GetProviderIDActive() {
+		status = true
 	}
+	return status
+}
+
+func (f F) GetProviderIDActive() string {
+	var id string
+	id = providerIDActive
+	if id == "" {
+		errors.Check(nil, runtime.F.GetCallerInfo(runtime.F{}, false), "There is no infrastructure provider set!", true, true, true)
+	}
+	return id
+}
+
+func (f F) SetProviderIDActive(id string) {
+	providerIDActive = id
 }
 
 func (f F) SetCluster() {
 	fieldPrefix := "Spec.Cluster."
-	sel := terminal.GetUserSelection("What should be the name of the cluster?", []string{"Default: cluster-ai-1"}, true, false)
+	var sel string = terminal.GetUserSelection("What should be the name of the cluster?", []string{"Default: cluster-ai-1"}, true, false)
 	if sel != "" {
 		f.setValue(fieldPrefix+"Name", sel)
 	}
@@ -84,10 +133,10 @@ func (f F) SetCluster() {
 func (f F) clusterSelfDeletion() {
 	logging.Log([]string{"\n", vars.EmojiSettings, vars.EmojiKubernetes}, "The self deletion feature enables the automatic release of all hardware related resources by deleting the cluster after n hours of inactivity.", 0)
 	logging.Log([]string{"", vars.EmojiKubernetes, vars.EmojiWarning}, "This can be useful to save development costs but keep in mind that all persistent cluster storage will also be deleted with the cluster itself.", 0)
-	sel := terminal.GetUserSelection("Do you want to enable the cluster self deletion?", []string{}, false, true)
+	var sel string = terminal.GetUserSelection("Do you want to enable the cluster self deletion?", []string{}, false, true)
 	if sel == "Yes" {
 		f.setValue("Spec.Cluster.SelfDeletion.Active", "true")
-		timeDuration := terminal.GetUserInput("After which number of hours of inactivity should the self deletion occur?")
+		var timeDuration string = terminal.GetUserInput("After which number of hours of inactivity should the self deletion occur?")
 		f.setValue("Spec.Cluster.SelfDeletion.TimeDurationHours", timeDuration)
 	} else {
 		f.setValue("Spec.Cluster.SelfDeletion.Active", "false")
@@ -95,7 +144,7 @@ func (f F) clusterSelfDeletion() {
 }
 
 func (f F) SetMachineSpec() {
-	sel := terminal.GetUserSelection("Which machine type should be the default?", []string{"Default: e2-standard-4"}, true, false)
+	var sel string = terminal.GetUserSelection("Which machine type should be the default?", []string{"Default: e2-standard-4"}, true, false)
 	if sel != "" {
 		f.setValue("Spec.Gcloud.MachineType", sel)
 	}
@@ -103,10 +152,10 @@ func (f F) SetMachineSpec() {
 
 func (f F) SetModuleSpec(context string) {
 	logging.Log([]string{"\n", vars.EmojiKubernetes, vars.EmojiInfo}, "Please configure your "+context+" environment.", 0)
-	accType := terminal.GetUserSelection("Which type of accelerator do you want to choose for "+context+"?", []string{"tpu", "gpu"}, false, false)
+	var accType string = terminal.GetUserSelection("Which type of accelerator do you want to choose for "+context+"?", []string{"tpu", "gpu"}, false, false)
 	contextID := strings.Title(context)
 	f.setValue("Spec."+contextID+".Type", accType)
-	sel := terminal.GetUserSelection("Which IDE do you want to choose?", []string{"vscode", "other"}, false, false)
+	var sel string = terminal.GetUserSelection("Which IDE do you want to choose?", []string{"vscode", "other"}, false, false)
 	if sel != "" {
 		f.setValue("Spec."+contextID+".Environment.IDE", sel)
 	}
@@ -122,7 +171,7 @@ func (f F) SetModuleSpec(context string) {
 	sel = terminal.GetUserSelection("Do you want to enable the accelerator self deletion after n hours of inactivity?", []string{}, false, true)
 	if sel == "Yes" {
 		f.setValue("Spec."+contextID+".SelfDeletion.Active", "true")
-		timeDuration := terminal.GetUserInput("After which number of hours of inactivity should the self deletion occur?")
+		var timeDuration string = terminal.GetUserInput("After which number of hours of inactivity should the self deletion occur?")
 		f.setValue("Spec."+contextID+".SelfDeletion.TimeDurationHours", timeDuration)
 	} else {
 		f.setValue("Spec."+contextID+".SelfDeletion.Active", "false")
@@ -136,19 +185,19 @@ func (f F) SetModuleSpec(context string) {
 }
 
 func (f F) SetGcloudAccelerator(context, accType string) {
-	logging.Log([]string{"\n", vars.EmojiKubernetes, vars.EmojiInfo}, "Please configure your gcloud "+accType+" accelerator.", 0)
-	nodesDiskSizeGb := terminal.GetUserSelection("Which disk size should the kubernetes node have that is attached to the accelerator? [GB]", []string{"Default: 70"}, true, false)
+	logging.Log([]string{"\n", vars.EmojiKubernetes, vars.EmojiInfo}, "Please configure your "+vars.InfraProviderGcloud+" "+accType+" accelerator.", 0)
+	var nodesDiskSizeGb string = terminal.GetUserSelection("Which disk size should the kubernetes node have that is attached to the accelerator? [GB]", []string{"Default: 70"}, true, false)
 	f.setValue("Spec.Gcloud.Accelerator."+strings.ToUpper(accType)+".Node.DiskSizeGb", nodesDiskSizeGb)
 	if accType == "tpu" {
 		var success bool
-		zone := f.getValue("Spec.Gcloud.Zone")
+		var zone string = f.getValue("Spec.Gcloud.Zone")
 		for ok := true; ok; ok = !success {
-			version := terminal.GetUserSelection("Which "+accType+" version do you want to choose?", []string{"v3", "v2"}, false, false)
+			var version string = terminal.GetUserSelection("Which "+accType+" version do you want to choose?", []string{"v3", "v2"}, false, false)
 			f.setValue("Spec.Gcloud.Accelerator.TPU.Version", version)
 			if version == "v2" {
-				cores := terminal.GetUserSelection("Which number of cores should the TPU have?", []string{"8", "32", "128", "256", "512"}, false, false)
+				var cores string = terminal.GetUserSelection("Which number of cores should the TPU have?", []string{"8", "32", "128", "256", "512"}, false, false)
 				if cores == "8" {
-					preemptible := terminal.GetUserSelection("Should the TPU be preemptible for cost saving?", []string{}, false, true)
+					var preemptible string = terminal.GetUserSelection("Should the TPU be preemptible for cost saving?", []string{}, false, true)
 					if preemptible == "Yes" {
 						f.setValue("Spec.Gcloud.Accelerator.TPU.Version", "preemptible-"+version)
 					}
@@ -164,7 +213,7 @@ func (f F) SetGcloudAccelerator(context, accType string) {
 					success = true
 				}
 			} else if version == "v3" {
-				preemptible := terminal.GetUserSelection("Should the TPU be preemptible for cost saving?", []string{}, false, true)
+				var preemptible string = terminal.GetUserSelection("Should the TPU be preemptible for cost saving?", []string{}, false, true)
 				if preemptible == "Yes" {
 					f.setValue("Spec.Gcloud.Accelerator.TPU.Version", "preemptible-"+version)
 				}
@@ -172,77 +221,123 @@ func (f F) SetGcloudAccelerator(context, accType string) {
 				success = true
 			}
 		}
-		framework := f.getValue("Spec." + strings.Title(context) + ".Environment.Framework")
+		var framework string = f.getValue("Spec." + strings.Title(context) + ".Environment.Framework")
 		var tfVersionOptions []string
 		if framework == "pytorch" {
 			tfVersionOptions = append(tfVersionOptions, "Default: pytorch-1.7")
 		} else if framework == "tensorflow" {
 			tfVersionOptions = append(tfVersionOptions, "Default: 2.3")
 		}
-		tfVersion := terminal.GetUserSelection("Which TF version should be the default for the TPUs?", tfVersionOptions, true, false)
+		var tfVersion string = terminal.GetUserSelection("Which TF version should be the default for the TPUs?", tfVersionOptions, true, false)
 		f.setValue("Spec.Gcloud.Accelerator.TPU.TF.Version", tfVersion)
-		machineType := terminal.GetUserSelection("Which machine type (kubernetes node) should be the default for TPUs?", []string{"Default: n1-standard-8"}, true, false)
+		var machineType string = terminal.GetUserSelection("Which machine type (kubernetes node) should be the default for TPUs?", []string{"Default: n1-standard-8"}, true, false)
 		f.setValue("Spec.Gcloud.Accelerator.TPU.MachineType", machineType)
 	} else if accType == "gpu" {
-		machineType := terminal.GetUserSelection("Which machine type (kubernetes node) should be the default for GPUs?", []string{"Default: n1-standard-8"}, true, false)
+		var machineType string = terminal.GetUserSelection("Which machine type (kubernetes node) should be the default for GPUs?", []string{"Default: n1-standard-8"}, true, false)
 		f.setValue("Spec.Gcloud.Accelerator.GPU.MachineType", machineType)
 		gpuTypeOptions := []string{"Default: nvidia-tesla-v100", "nvidia-tesla-t4", "nvidia-tesla-p100", "nvidia-tesla-p4", "nvidia-tesla-k80"}
-		gpuType := terminal.GetUserSelection("Which GPU model do you want to choose?", gpuTypeOptions, true, false)
+		var gpuType string = terminal.GetUserSelection("Which GPU model do you want to choose?", gpuTypeOptions, true, false)
 		f.setValue("Spec.Gcloud.Accelerator.GPU.Type", gpuType)
 	}
 }
 
 func (f F) SetNeuraKubeSpec() {
 	logging.Log([]string{"\n", vars.EmojiKubernetes, vars.EmojiWarning}, "Please choose a volume size for the persistant storage of "+vars.NeuraKubeName+".\nWe recommend about 5 GB for medium sized setups.", 0)
-	sel := terminal.GetUserInput("How big should be the volume size of " + vars.NeuraKubeName + "? [GB]")
+	var sel string = terminal.GetUserInput("How big should be the volume size of " + vars.NeuraKubeName + "? [GB]")
 	if sel != "" {
 		f.setValue("Spec.Neurakube.VolumeSizeGB", sel)
 	}
 }
 
-func (f F) validKubeConfig() bool {
-	var valid bool
-	fieldsPrefix := "Spec.Cluster."
-	fields := []string{"KubeConfigPath"}
-	valid = objects.StructFieldValuesExisting(config, fieldsPrefix, fields, runtime.F.GetCallerInfo(runtime.F{}, true))
-	if !filesystem.Exists(objects.GetFieldValueFromStruct(config, fieldsPrefix+fields[0], runtime.F.GetCallerInfo(runtime.F{}, true))) {
-		valid = false
-	}
-	return valid
-}
-
 func (f F) SetKubeConfig() {
-	if f.validKubeConfig() {
-		logging.Log([]string{"", vars.EmojiSettings, vars.EmojiInfra}, "Using infrastructure provider: selfhosted (kubeconfig)\n", 0)
-	} else {
-		logging.Log([]string{"", vars.EmojiSettings, vars.EmojiInfra}, "Invalid and/or missing kubeconfigs in infrastructure config.\nStarting assistant to retrieve missing settings..\n", 0)
-		f.setKubeConfigAuth()
-	}
-	vars.InfraProviderActive = vars.InfraProviderSelfHosted
+	var clusterName string = f.getValue("Spec.Cluster.ID")
+	logging.Log([]string{"", vars.EmojiAssistant, vars.EmojiKubernetes}, "You have to set up the authentication (kubeconfig) for cluster "+clusterName+".\n", 0)
+	f.setKubeConfigAuth()
 }
 
 func (f F) setKubeConfigAuth() {
-	logging.Log([]string{"", vars.EmojiSettings, vars.EmojiKubernetes}, "Please configure the kubernetes cluster authentication (kubeconfig).", 0)
-	locHomeDir := terminal.GetUserSelection("Do you want to import your kubeconfig file from your OS user home directory ("+filesystem.GetUserHomeDir()+")?", []string{}, false, true)
-	var path string
-	if locHomeDir == "Yes" {
-		path = filesystem.GetUserHomeDir() + "/.kube/"
-	} else {
-		path = f.getProjectAuthPath()
-		logging.Log([]string{"", vars.EmojiSettings, vars.EmojiKubernetes}, "Okay, then please manually copy your kubeconfig file to your project located at: "+path, 0)
-		logging.Log([]string{"", vars.EmojiSettings, vars.EmojiKubernetes}, "If you have inserted the kubeconfig file at this location you can select it here:", 0)
+	var pathDefault string = filesystem.GetUserHomeDir() + "/.kube/config"
+	var optDefaultLoc string = "I already have one placed at " + pathDefault
+	var optAssistant string = "How to get it?"
+	var optCustomLoc string = "At a custom location"
+	var userOpts []string
+	userOpts = []string{optDefaultLoc, optAssistant, optCustomLoc}
+	var selLoc string = terminal.GetUserSelection("Where is the file located?", userOpts, false, false)
+	var filePath string
+	var clusterName string = f.getValue("Spec.Cluster.ID")
+	if selLoc == optDefaultLoc {
+		filePath = pathDefault
+	} else if selLoc == optAssistant {
+		filePath = pathDefault
+		var gcloudZone string = f.getValue("Spec.Gcloud.Zone")
+		if f.ProviderIDIsActive("gcloud") {
+			var gcloudAlias string = "gcloud"
+			var gcloudArgs []string = strings.Split("container clusters get-credentials "+clusterName+" --zone="+gcloudZone, " ")
+			var gcloudCmd string = gcloudAlias + " " + strings.Join(gcloudArgs, " ")
+			logging.Log([]string{"", vars.EmojiSettings, vars.EmojiInfo}, "The auto. fetching of the kubeconfig independent of the "+vars.InfraProviderGcloud+" SDK is not yet available.", 0)
+			logging.Log([]string{"", vars.EmojiSettings, vars.EmojiInfo}, "Therefore you have to initially get the cluster credentials manually via the "+vars.InfraProviderGcloud+" CLI:\n", 0)
+			logging.Log([]string{"", vars.EmojiSettings, vars.EmojiInfo}, gcloudCmd+"\n", 0)
+			logging.Log([]string{"", vars.EmojiSettings, vars.EmojiInfo}, "The file will be placed at: "+pathDefault+"config", 0)
+			logging.Log([]string{"", vars.EmojiSettings, vars.EmojiInfo}, "Further information: https://cloud.google.com/sdk/gcloud/reference/container/clusters/get-credentials", 0)
+			var sel string = terminal.GetUserSelection("Do you want "+env.F.GetActive(env.F{}, true)+" to execute the "+vars.InfraProviderGcloud+" command for you?", []string{}, false, true)
+			if sel == "Yes" {
+				var err error = exec.WithLiveLogs(gcloudAlias, gcloudArgs, true)
+				if !errors.Check(err, runtime.F.GetCallerInfo(runtime.F{}, false), "Unable to execute glcoud command: "+gcloudCmd, false, true, true) {
+					logging.Log([]string{"", vars.EmojiKubernetes, vars.EmojiSuccess}, "Fetched kubeconfig from glcoud.", 0)
+				}
+			} else {
+				var sel string = terminal.GetUserSelection("Do you have the kubeconfig file now in place (check at "+pathDefault+")", []string{}, false, true)
+				if sel != "Yes" {
+					logging.Log([]string{"", vars.EmojiSettings, vars.EmojiKubernetes}, "Okay, then try it again with a new run.", 0)
+					terminal.Exit(0, "")
+				}
+			}
+		} else if f.ProviderIDIsActive("selfhosted") {
+			logging.Log([]string{"", vars.EmojiSettings, vars.EmojiKubernetes}, "There are no routines available yet for selfhosted infrastructures.", 0)
+		}
+	} else if selLoc == optCustomLoc {
+		logging.Log([]string{"", vars.EmojiSettings, vars.EmojiKubernetes}, "Okay, then please manually copy your kubeconfig file to your infrastructure auth. located at: "+pathDefault, 0)
+		filePath = terminal.GetUserInput("Where is the kubeconfig located [filePath]?")
 	}
-	projectAuthPath := terminal.UserSelectionFiles("Which kubeconfig file should be the default for your projects?", "files", path, []string{}, []string{"hidden"}, false, true)
-	if locHomeDir == "Yes" {
-		fileName := filesystem.GetFileNameFromDirPath(path)
-		projectAuthPath = f.getProjectAuthPath() + fileName
-		filesystem.Copy(path, projectAuthPath, false)
+	if selLoc == optDefaultLoc || selLoc == optAssistant {
+		var fileName string = filesystem.GetFileNameFromDirPath(filePath)
+		var projectAuthPath string = f.GetInfraKubeAuthPath(false) + fileName
+		if filesystem.Exists(projectAuthPath) {
+			filesystem.Delete(projectAuthPath, false)
+		}
+		filesystem.Copy(filePath, projectAuthPath, false)
 	}
-	f.setValue("Spec.Cluster.Auth.KubeConfigPath", projectAuthPath)
 }
 
-func (f F) getProjectAuthPath() string {
-	return users.GetIDActive() + vars.ProjectInfrastructureAuthPath
+var clusterRecentlyDeleted bool
+
+func (f F) SetClusterRecentlyDeleted(deleted bool) {
+	clusterRecentlyDeleted = deleted
+}
+
+func (f F) GetClusterRecentlyDeleted() bool {
+	return clusterRecentlyDeleted
+}
+
+func (f F) GetInfraKubePath() string {
+	return f.GetPath(false) + "clusters/"
+}
+
+func (f F) GetInfraKubeAuthPath(withFileName bool) string {
+	var path string
+	path = f.GetInfraKubePath() + kubeID.F.GetActive(kubeID.F{}) + "/auth/"
+	if withFileName {
+		path = path + "config"
+	}
+	return path
+}
+
+func (f F) GetInfraGcloudPath() string {
+	return f.GetPath(false) + "public-clouds/gcloud/"
+}
+
+func (f F) GetInfraGcloudAuthPath() string {
+	return f.GetInfraGcloudPath() + "auth/service-account.json"
 }
 
 func (f F) setValue(key string, value string) {
